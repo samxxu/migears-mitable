@@ -48,7 +48,7 @@ jobs:
         run: composer install --no-interaction --prefer-dist
 
       - name: Unit tests (SQLite in memory)
-        run: composer test:unit
+        run: composer test:unit -- --fail-on-skipped
 
       - name: Integration tests (real MySQL via service container)
         env:
@@ -57,4 +57,7 @@ jobs:
           MYSQL_USER: root
           MYSQL_PASSWORD: migears
           MYSQL_DB: migears_mitable_test
-        run: composer test:integration
+        # A skipped integration test exits 0, so without this flag an
+        # unreachable database would turn the build green while testing
+        # nothing. Skipping stays the sane default locally.
+        run: composer test:integration -- --fail-on-skipped
