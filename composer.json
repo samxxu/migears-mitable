@@ -1,10 +1,18 @@
 {
     "name": "migears/mitable",
-    "description": "Minimalist single-table database management — DDL, CRUD, and paginated iteration in one class.",
+    "description": "Minimalist single-table execution helper for one-off data migrations — DDL, CRUD, introspection, and cursor-based iteration in one class.",
     "type": "library",
     "license": "MIT",
     "version": "2.0.0",
-    "keywords": ["database", "table", "ddl", "crud", "pdo", "migears"],
+    "keywords": [
+        "database",
+        "table",
+        "ddl",
+        "crud",
+        "migration",
+        "pdo",
+        "migears"
+    ],
     "require": {
         "php": "^8.1",
         "ext-pdo": "*"
@@ -25,5 +33,10 @@
         "psr-4": {
             "MiGears\\MiTable\\Tests\\": "tests/"
         }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "test:unit": "phpunit --testsuite unit",
+        "test:integration": "phpunit --testsuite integration"
     }
 }
