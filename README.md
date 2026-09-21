@@ -341,7 +341,7 @@ miGears MiTable follows the miGears philosophy: **minimal, readable, and useful*
 - **One class** — no abstracts, no traits, no interfaces
 - **PDO only** — no query builder dependency
 - **Safe by default** — every data operation uses prepared statements
-- **Small enough to read** — roughly 540 lines of code
+- **Small enough to read** — roughly 560 lines of code
 
 **What we don't do**:
 
@@ -725,7 +725,7 @@ miGears MiTable 遵循 miGears 设计哲学：**极简、可读、实用**。
 - **一个类** — 没有抽象类、没有 trait、没有接口
 - **仅依赖 PDO** — 不依赖查询构建器
 - **默认安全** — 所有数据操作都使用预处理语句
-- **小到可以读完** — 约 540 行代码
+- **小到可以读完** — 约 560 行代码
 
 **我们不做的事**：
 
