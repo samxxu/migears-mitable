@@ -20,6 +20,8 @@ It knows how to create a table, change its columns, write and transform its rows
 
 Keeping version management and orchestration outside is deliberate: they need global state and would destroy the readability that makes this class useful.
 
+The reasoning behind this split, the migration scenarios the class is built for, and the record of what changed and why are written up in [docs/mitable-improvement-plan.html](docs/mitable-improvement-plan.html) (in Chinese).
+
 ## Features
 
 - **DDL** — create, drop, exists, rename, truncate; add/drop/modify/rename columns; regular, unique, and primary key indexes
@@ -403,6 +405,8 @@ MiTable 是**迁移脚本的执行层**，不是迁移框架。
 | 裸 PDO（逃生通道） | JOIN、多表写入、复杂条件 —— 通过 `getPdo()` 直达 |
 
 把版本管理和编排留在包外是刻意的：它们需要全局状态，一旦塞进来就会毁掉这个类赖以立足的可读性。
+
+这条切分的理由、它服务的迁移场景，以及改了什么、为什么改的完整记录，见 [docs/mitable-improvement-plan.html](docs/mitable-improvement-plan.html)。
 
 ## 特性
 
