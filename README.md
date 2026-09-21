@@ -332,7 +332,7 @@ Schema changes are not covered by this. MySQL commits implicitly around DDL, so 
 
 MySQL/MariaDB and SQLite are the supported targets. DDL table options (`ENGINE`, `CHARSET`, `COLLATE`) and `AFTER` positioning apply to MySQL and are ignored or adapted on SQLite. `rowCount()` semantics vary by driver, as noted above.
 
-Introspection is implemented for MySQL (`SHOW COLUMNS`, `SHOW KEYS`, `SHOW INDEX`) and SQLite (`PRAGMA table_info`, `PRAGMA index_list`, `PRAGMA index_info`). On other drivers the iterator falls back to `OFFSET` paging and `exists()` probes the table directly. For production MySQL, `ext-pdo_mysql` is required.
+Introspection is implemented for MySQL (`SHOW COLUMNS`, `SHOW KEYS`, `SHOW INDEX`) and SQLite (`PRAGMA table_info`, `PRAGMA index_list`, `PRAGMA index_info`). On any other driver, `showColumns()` and `showIndexes()` throw a `RuntimeException` naming the driver, rather than reaching a SQLite-only statement and failing with a confusing syntax error. Everything else stays driver-agnostic: the iterator falls back to `OFFSET` paging and `exists()` probes the table directly. For production MySQL, `ext-pdo_mysql` is required.
 
 ## Design Philosophy
 
@@ -373,6 +373,8 @@ The integration suite exercises the MySQL-specific paths the unit suite cannot r
 | 4 | Nothing reachable | every integration test is skipped |
 
 A container spawned for the run is removed when the process ends, and each test method starts from a schema with no tables. A `MYSQL_DSN` or `MYSQL_HOST` you provide is used as given: if it is wrong the suite fails instead of quietly falling back, so a misconfigured job cannot pass by accident.
+
+CI runs both suites on every push across PHP 8.1–8.4, the integration one against a MySQL service container.
 
 ## License
 
@@ -714,7 +716,7 @@ $users->withTransaction(function () use ($users) {
 
 支持的目标是 MySQL/MariaDB 与 SQLite。DDL 表选项（`ENGINE`、`CHARSET`、`COLLATE`）和 `AFTER` 定位针对 MySQL 生效，在 SQLite 上被忽略或改写。`rowCount()` 的语义随驱动而异，见上文。
 
-结构反射分别针对 MySQL（`SHOW COLUMNS`、`SHOW KEYS`、`SHOW INDEX`）与 SQLite（`PRAGMA table_info`、`PRAGMA index_list`、`PRAGMA index_info`）实现。在其他驱动上，迭代器降级为 `OFFSET` 翻页，`exists()` 直接探测表。生产环境 MySQL 部署需要 `ext-pdo_mysql`。
+结构反射分别针对 MySQL（`SHOW COLUMNS`、`SHOW KEYS`、`SHOW INDEX`）与 SQLite（`PRAGMA table_info`、`PRAGMA index_list`、`PRAGMA index_info`）实现。在其他驱动上，`showColumns()` 与 `showIndexes()` 会抛出 `RuntimeException` 并指明驱动名，而不是走到只有 SQLite 才有的语句上抛出令人困惑的语法错误。其余能力保持驱动无关：迭代器降级为 `OFFSET` 翻页，`exists()` 直接探测表。生产环境 MySQL 部署需要 `ext-pdo_mysql`。
 
 ## 设计哲学
 
@@ -755,6 +757,8 @@ composer test:integration  # MySQL/MariaDB
 | 4 | 都不可用 | 所有集成测试标记为跳过 |
 
 运行期间起的容器会在进程结束时删除，每个测试方法都从"不含任何表"的空库开始。你显式提供的 `MYSQL_DSN` 或 `MYSQL_HOST` 会被原样使用：配错了就是失败，而不是悄悄降级，因此配置错误的流水线不会意外通过。
+
+CI 在每次推送时都会跑这两个套件，PHP 版本覆盖 8.1–8.4，其中集成套件跑在 MySQL service container 上。
 
 ## 许可证
 

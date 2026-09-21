@@ -171,6 +171,26 @@ final class MiTableTest extends TestCase
         self::assertSame([], $this->table->showIndexes());
     }
 
+    public function testShowColumnsOnUnsupportedDriverExplainsItself(): void
+    {
+        $table = new MiTable(new UnsupportedDriverPdo(), 'users');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('showColumns() supports MySQL and SQLite; the "pgsql" driver is not supported');
+
+        $table->showColumns();
+    }
+
+    public function testShowIndexesOnUnsupportedDriverExplainsItself(): void
+    {
+        $table = new MiTable(new UnsupportedDriverPdo(), 'users');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('showIndexes() supports MySQL and SQLite; the "pgsql" driver is not supported');
+
+        $table->showIndexes();
+    }
+
     public function testIndexMigrationIsIdempotentAcrossRuns(): void
     {
         $this->createUsersTable();
@@ -927,5 +947,29 @@ final class MiTableTest extends TestCase
         foreach ($names as $name) {
             $this->table->insert(['username' => $name, 'email' => "{$name}@example.com"]);
         }
+    }
+}
+
+/**
+ * Reports an unsupported driver name over a real SQLite connection.
+ *
+ * The driver name is the only input the introspection guard branches on, so
+ * this exercises the unsupported path without that database being installed.
+ */
+final class UnsupportedDriverPdo extends PDO
+{
+    public function __construct()
+    {
+        parent::__construct('sqlite::memory:');
+        $this->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    }
+
+    public function getAttribute(int $attribute): mixed
+    {
+        if ($attribute === PDO::ATTR_DRIVER_NAME) {
+            return 'pgsql';
+        }
+
+        return parent::getAttribute($attribute);
     }
 }

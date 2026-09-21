@@ -274,6 +274,8 @@ class MiTable implements Iterator
      */
     public function showColumns(): array
     {
+        $this->requireIntrospectionDriver('showColumns');
+
         // MySQL raises an error for `SHOW COLUMNS` on a missing table while
         // SQLite returns an empty set, so the guard keeps the contract uniform.
         if (!$this->exists()) {
@@ -366,11 +368,34 @@ class MiTable implements Iterator
      */
     public function showIndexes(): array
     {
+        $this->requireIntrospectionDriver('showIndexes');
+
         if (!$this->exists()) {
             return [];
         }
 
         return $this->isMysql() ? $this->mysqlIndexes() : $this->sqliteIndexes();
+    }
+
+    /**
+     * Guard the introspection helpers, which only have MySQL and SQLite
+     * implementations.
+     *
+     * Other drivers share the generic iterator fallback happily, so they could
+     * otherwise reach a SQLite-only `PRAGMA` statement and fail with a confusing
+     * syntax error — or worse, be mistaken for a table with no columns.
+     */
+    private function requireIntrospectionDriver(string $method): void
+    {
+        if ($this->isMysql() || $this->isSqlite()) {
+            return;
+        }
+
+        $driver = (string) $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+
+        throw new \RuntimeException(
+            "{$method}() supports MySQL and SQLite; the \"{$driver}\" driver is not supported"
+        );
     }
 
     /**
