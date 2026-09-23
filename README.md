@@ -6,6 +6,10 @@ Minimalist single-table execution helper for one-off data migrations — DDL, CR
 
 MiTable wraps a PDO connection around a single table. Point it at one table, reshape the schema, move and transform rows, then get out of the way. No query builder dependency — just pure PDO.
 
+> **Background**: miGears is the open-source successor of **TinyGears**, a
+> self-developed PHP framework. It was renamed and open-sourced recently because
+> the name *TinyGears* is already taken in the open-source community.
+
 ## What this is, and what it is not
 
 MiTable is the **execution layer for migration scripts**, not a migration framework.
