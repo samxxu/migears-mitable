@@ -264,7 +264,7 @@
               <span class="layer-desc">迁移记录表与执行顺序、up/down 机制、幂等与自动回滚、跨表结构差异比对、跨库原子性。这些需要全局状态或跨连接协调。</span>
             </li>
             <li class="l--core">
-              <span class="layer-title"><span class="layer-role">MiTable · 本包职责</span></span>
+              <span class="layer-title"><span class="layer-role">表实现 · 本包职责</span></span>
               <span class="layer-desc">单表 DDL、批量写入与条件更新删除、结构反射、无内存遍历（含游标位置读写）。只在这一层演进。</span>
             </li>
             <li class="l--base">
@@ -273,7 +273,7 @@
             </li>
           </ul>
           <p>
-            把版本管理留在包外是刻意的。它需要一张记录表、一套执行顺序和一套回滚策略，塞进这个单类会立刻违背"可读、短时间读完"的纪律——而这份纪律正是这个类值得存在的原因。
+            把版本管理留在包外是刻意的。它需要一张记录表、一套执行顺序和一套回滚策略，塞进这个包会立刻违背"可读、短时间读完"的纪律——而这份纪律正是这类工具值得存在的原因。
           </p>
         </section>
 
@@ -388,7 +388,7 @@
         <section id="results">
           <h2>实施结果</h2>
           <p>
-            九项全部落地，源码从 473 行增至 1007 行（有效代码 556 行，36 个公开方法），保持单类实现、无抽象类、无 trait、无接口。改动按关注点拆成独立提交——版权更名、主体重构、CI、驱动守卫、文档各自分开，便于逐项回溯。
+            九项全部落地。此后又根据代码评审的结果做了一次结构拆分：原来"代码对驱动能力做了未经检验的假设"这个根因，通过把方言从散落的分支改为独立的类来根治——<code>MiTableInterface</code>（契约）、<code>TableOperations</code>（与方言无关的 CRUD、条件编译、游标迭代、事务），以及 <code>MySQLTable</code> 与 <code>SQLiteTable</code> 两个方言实现。源码 473 → 1494 行（有效代码 556 → 761 行），增量主要在接口签名与两处方言样板。改动按关注点拆成独立提交，便于逐项回溯。
           </p>
           <div class="table-wrap">
             <table>
@@ -500,7 +500,7 @@
         <section id="verification">
           <h2>验证能力</h2>
           <p>
-            这一轮真正的结构性变化不在源码，而在测试基础设施。测试分成两层：单元测试跑内存 SQLite，无需任何服务；集成测试跑真实 MySQL，专门覆盖单驱动测试触及不到的路径——<code>information_schema</code> 存在性检查、<code>SHOW COLUMNS</code> / <code>SHOW KEYS</code> / <code>SHOW INDEX</code> 结构反射、建表选项、<code>AFTER</code> 列定位、<code>USING</code> 索引类型、<code>rowCount</code> 语义，以及 DDL 与事务的交互。
+            这一轮真正的结构性变化不在源码，而在测试基础设施。测试分成两层——单元测试跑内存 SQLite，无需任何服务；集成测试跑真实 MySQL——但评审指出这两层测的是<strong>不同</strong>的东西，"跨驱动"因此从来不是一条被验证过的性质。随后补上了第三层：一致性套件把同一组断言在两种驱动上各跑一遍，同一份测试代码，只是在单元套件与集成套件里各实例化一次。于是"只有一个方言满足"的行为必然失败。
           </p>
           <p>
             集成测试按四层解析可用服务，逐级降级：
@@ -561,7 +561,7 @@
         <section id="remaining">
           <h2>剩余工作</h2>
           <p>
-            定位成立、场景全覆盖、验证闭环，剩下的都是可选项。
+            定位成立、场景全覆盖、验证闭环。代码评审另开出了一批待办，记录在 <code>ISSUES.md</code>：参差行的 <code>bulkInsert()</code> 会静默丢列或写入 null、畸形的条件元组被静默编译成 <code>IN</code>、<code>current()</code> 缺越界守卫、写方法隐含依赖 <code>PDO::ERRMODE_EXCEPTION</code>。这四项都位于与方言结构无关的那一半代码里，本轮未处理。除此之外还有下面三项。
           </p>
           <div class="improvements">
             <div class="improvement">
@@ -589,7 +589,7 @@
 
           <div class="callout callout--warn">
             <div class="callout__label">明确不做</div>
-            <p>迁移运行器与版本表、up/down 指令、事务自管理与重试、跨表 JOIN、结构差异比对、跨库原子性。这六项都需要全局状态或跨连接协调，一旦混入，单类可读性即告失守。上面那条边界判据正是为挡住它们而写的。</p>
+            <p>迁移运行器与版本表、up/down 指令、事务自管理与重试、跨表 JOIN、结构差异比对、跨库原子性。这六项都需要全局状态或跨连接协调，一旦混入，可读性即告失守。上面那条边界判据正是为挡住它们而写的。</p>
           </div>
         </section>
 
@@ -599,7 +599,7 @@
         <div class="sources">
           <h2>来源与依据</h2>
           <ol>
-            <li>本文基于 <code>migears-mitable</code> 当前源码（<code>src/MiTable.php</code>、1007 行／有效代码 556 行）与测试（70 项单元 + 38 项 MySQL 集成）直接审读与实跑，未引入外部资料。</li>
+            <li>本文基于 <code>migears-mitable</code> 当前源码（<code>src/</code> 四个文件、1494 行／有效代码 761 行）与测试直接审读与实跑，未引入外部资料。</li>
             <li>起点数据取自仓库首个提交：源码 473 行、单测 25 个方法。</li>
             <li>集成测试的四层解析顺序与跳过行为经本机实测：docker 起 <code>mysql:8.0</code>、docker 隐藏后降级 podman、两者皆隐藏后 38 项跳过，三种情形均验证通过；<code>MYSQL_HOST</code> 路径另用固定端口容器模拟 CI 验证通过。</li>
             <li>CI 运行结果取自 GitHub Actions 的公开 API：四个 PHP 版本 8.1–8.4 的两个套件均为 success，集成测试步骤耗时 1–6 秒（跳过时为 0 秒量级，两者可区分）。</li>

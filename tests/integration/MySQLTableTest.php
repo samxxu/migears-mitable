@@ -6,7 +6,7 @@ namespace MiGears\MiTable\Tests\Integration;
 
 use PDO;
 use PHPUnit\Framework\Attributes\CoversClass;
-use MiGears\MiTable\MiTable;
+use MiGears\MiTable\MySQLTable;
 use MiGears\MiTable\Tests\MySqlTestCase;
 
 /**
@@ -19,15 +19,15 @@ use MiGears\MiTable\Tests\MySqlTestCase;
  *
  * Skipped automatically when no server is reachable.
  */
-#[CoversClass(MiTable::class)]
-final class MiTableMySqlTest extends MySqlTestCase
+#[CoversClass(MySQLTable::class)]
+final class MySQLTableTest extends MySqlTestCase
 {
-    private MiTable $table;
+    private MySQLTable $table;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->table = new MiTable($this->pdo, 'users');
+        $this->table = new MySQLTable($this->pdo, 'users');
     }
 
     // ==================== DDL ====================

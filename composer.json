@@ -1,6 +1,6 @@
 {
     "name": "migears/mitable",
-    "description": "Minimalist single-table execution helper for one-off data migrations — DDL, CRUD, introspection, and cursor-based iteration in one class.",
+    "description": "Minimalist single-table execution helper for one-off data migrations — DDL, CRUD, introspection, and cursor-based iteration, with a class per SQL dialect.",
     "type": "library",
     "license": "MIT",
     "version": "2.0.0",

@@ -1,0 +1,343 @@
+<?php
+
+declare(strict_types=1);
+
+namespace MiGears\MiTable\Tests\Conformance;
+
+use MiGears\MiTable\MiTableInterface;
+
+/**
+ * The assertions every dialect implementation must satisfy identically.
+ *
+ * This trait is the answer to a real gap: before it existed, the SQLite suite
+ * and the MySQL suite tested *different* things, so "cross-driver" was never a
+ * verified property. The DDL verbs with no SQLite coverage at all —
+ * rename, truncate, renameColumn, dropColumn — went unnoticed for a whole
+ * version because nothing ran them on both drivers.
+ *
+ * A subclass supplies the connection and the fixture, creating a fresh table
+ * per test:
+ *
+ *   protected function newTable(): MiTableInterface
+ *
+ * Dialect-specific behaviour stays out of here: MySQL's AFTER positioning and
+ * USING index types, SQLite's rowid-alias primary key, and the three DDL verbs
+ * SQLite has no ALTER equivalent for all belong in the per-dialect suites.
+ */
+trait TableConformanceTests
+{
+    protected MiTableInterface $conform;
+
+    /** Create a fresh, empty standard table for the dialect under test. */
+    abstract protected function newTable(): MiTableInterface;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->conform = $this->newTable();
+    }
+
+    /**
+     * An instance bound to a table name that does not exist.
+     *
+     * Drops the fixture created by setUp() rather than building another one,
+     * because the table it was built from is still present mid-test.
+     */
+    protected function missingTable(): MiTableInterface
+    {
+        $this->conform->drop();
+
+        return $this->conform;
+    }
+
+    // ==================== DDL ====================
+
+    public function testCreateAndExists(): void
+    {
+        self::assertTrue($this->conform->exists());
+
+        $this->conform->drop();
+
+        self::assertFalse($this->conform->exists());
+    }
+
+    public function testCreateRejectsAnEmptyColumnList(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->conform->create([]);
+    }
+
+    public function testRenameMovesTheTableAndKeepsItsRows(): void
+    {
+        $this->conform->insert(['username' => 'alice', 'email' => 'a@example.com']);
+
+        $renamed = $this->conform->rename('renamed_users');
+
+        self::assertSame('renamed_users', $renamed->getName());
+        self::assertTrue($renamed->exists());
+        self::assertFalse($this->conform->exists());
+        self::assertSame(1, $renamed->count());
+        self::assertSame('alice', $renamed->find(['username' => 'alice'])['username']);
+    }
+
+    public function testTruncateEmptiesTheTableAndKeepsIt(): void
+    {
+        $this->conform->insert(['username' => 'alice', 'email' => 'a@example.com']);
+        $this->conform->insert(['username' => 'bob', 'email' => 'b@example.com']);
+
+        $this->conform->truncate();
+
+        self::assertSame(0, $this->conform->count());
+        self::assertTrue($this->conform->exists());
+    }
+
+    public function testTruncateRestartsTheIdentityColumn(): void
+    {
+        $this->conform->insert(['username' => 'alice', 'email' => 'a@example.com']);
+        $this->conform->insert(['username' => 'bob', 'email' => 'b@example.com']);
+
+        $this->conform->truncate();
+        $id = $this->conform->insert(['username' => 'carol', 'email' => 'c@example.com']);
+
+        self::assertSame(1, (int) $id);
+    }
+
+    public function testAddColumn(): void
+    {
+        $this->conform->addColumn('phone', 'VARCHAR(20) NULL');
+
+        $columns = $this->conform->showColumns();
+        self::assertArrayHasKey('phone', $columns);
+
+        $id = $this->conform->insert(['username' => 'alice', 'email' => 'a@example.com', 'phone' => '123']);
+        self::assertSame('123', $this->conform->find(['id' => $id])['phone']);
+    }
+
+    public function testDropColumn(): void
+    {
+        $this->conform->dropColumn('email');
+
+        self::assertArrayNotHasKey('email', $this->conform->showColumns());
+    }
+
+    public function testRenameColumn(): void
+    {
+        $this->conform->insert(['username' => 'alice', 'email' => 'a@example.com']);
+
+        $this->conform->renameColumn('username', 'handle', 'VARCHAR(50) NOT NULL');
+
+        $columns = $this->conform->showColumns();
+        self::assertArrayHasKey('handle', $columns);
+        self::assertArrayNotHasKey('username', $columns);
+        self::assertSame('alice', $this->conform->find(['handle' => 'alice'])['handle']);
+    }
+
+    public function testAddAndDropIndex(): void
+    {
+        $this->conform->addIndex('idx_username', ['username']);
+        self::assertArrayHasKey('idx_username', $this->conform->showIndexes());
+
+        $this->conform->dropIndex('idx_username');
+        self::assertArrayNotHasKey('idx_username', $this->conform->showIndexes());
+    }
+
+    public function testAddUniqueIndexEnforcesUniqueness(): void
+    {
+        $this->conform->addUniqueIndex('uniq_username', ['username']);
+        $this->conform->insert(['username' => 'alice', 'email' => 'a@example.com']);
+
+        self::assertTrue($this->conform->showIndexes()['uniq_username']['unique']);
+
+        $this->expectException(\PDOException::class);
+        $this->conform->insert(['username' => 'alice', 'email' => 'b@example.com']);
+    }
+
+    // ==================== Introspection ====================
+
+    public function testShowColumnsReportsTheStandardShape(): void
+    {
+        $columns = $this->conform->showColumns();
+
+        self::assertSame(['id', 'username', 'email'], array_keys($columns));
+        self::assertTrue($columns['id']['primary']);
+        self::assertSame(false, $columns['id']['nullable']);
+        self::assertFalse($columns['username']['nullable']);
+        self::assertTrue($columns['email']['nullable']);
+    }
+
+    public function testShowColumnsAndIndexesReturnEmptyForAMissingTable(): void
+    {
+        $missing = $this->missingTable();
+
+        self::assertSame([], $missing->showColumns());
+        self::assertSame([], $missing->showIndexes());
+    }
+
+    public function testShowIndexesReportsAColumnList(): void
+    {
+        $this->conform->addUniqueIndex('uniq_username_email', ['username', 'email']);
+
+        // A composite index is invisible to showColumns(); this is why
+        // showIndexes() exists.
+        self::assertSame(['username', 'email'], $this->conform->showIndexes()['uniq_username_email']['columns']);
+    }
+
+    // ==================== CRUD ====================
+
+    public function testInsertFindAndCount(): void
+    {
+        self::assertSame(0, $this->conform->count());
+
+        $id = $this->conform->insert(['username' => 'alice', 'email' => 'a@example.com']);
+
+        self::assertSame(1, (int) $id);
+        self::assertSame('alice', $this->conform->find(['id' => $id])['username']);
+        self::assertNull($this->conform->find(['username' => 'nobody']));
+        self::assertSame(1, $this->conform->count());
+    }
+
+    public function testBulkInsert(): void
+    {
+        $affected = $this->conform->bulkInsert([
+            ['username' => 'alice', 'email' => 'a@example.com'],
+            ['username' => 'bob', 'email' => 'b@example.com'],
+            ['username' => 'carol', 'email' => 'c@example.com'],
+        ]);
+
+        self::assertSame(3, $affected);
+        self::assertSame(3, $this->conform->count());
+    }
+
+    public function testBulkInsertWithNoRows(): void
+    {
+        self::assertSame(0, $this->conform->bulkInsert([]));
+    }
+
+    public function testUpdate(): void
+    {
+        $id = $this->conform->insert(['username' => 'alice', 'email' => 'old@example.com']);
+
+        $affected = $this->conform->update(['email' => 'new@example.com'], ['id' => $id]);
+
+        self::assertSame(1, $affected);
+        self::assertSame('new@example.com', $this->conform->find(['id' => $id])['email']);
+    }
+
+    public function testDelete(): void
+    {
+        $id = $this->conform->insert(['username' => 'alice', 'email' => 'a@example.com']);
+
+        self::assertSame(1, $this->conform->delete(['id' => $id]));
+        self::assertNull($this->conform->find(['id' => $id]));
+    }
+
+    public function testWhereWithOrderAndLimit(): void
+    {
+        $this->conform->bulkInsert([
+            ['username' => 'alice', 'email' => 'a@example.com'],
+            ['username' => 'bob', 'email' => 'b@example.com'],
+            ['username' => 'carol', 'email' => 'c@example.com'],
+        ]);
+
+        $rows = $this->conform->where([], 'username DESC', 2);
+
+        self::assertSame(['carol', 'bob'], array_column($rows, 'username'));
+    }
+
+    // ==================== Condition shapes ====================
+
+    public function testConditionsCompileTheSameWayEverywhere(): void
+    {
+        $this->conform->bulkInsert([
+            ['username' => 'alice', 'email' => 'a@example.com'],
+            ['username' => 'bob', 'email' => 'b@example.com'],
+            ['username' => 'carol', 'email' => 'c@example.com'],
+        ]);
+
+        self::assertSame(2, $this->conform->count(['username' => ['alice', 'carol']]));
+        self::assertSame(1, $this->conform->count(['username' => ['not in', ['alice', 'bob']]]));
+        self::assertSame(2, $this->conform->count(['id' => ['>=', 2]]));
+        self::assertSame(2, $this->conform->count(['id' => ['between', [2, 3]]]));
+        self::assertSame(1, $this->conform->count(['username' => ['like', '%ob%']]));
+        self::assertSame(3, $this->conform->count(['email' => ['!=', null]]));
+        self::assertSame(3, $this->conform->count(['username' => ['in', ['alice', 'bob', 'carol']]]));
+    }
+
+    // ==================== Iteration ====================
+
+    public function testCursorIterationWalksEveryRowInOrder(): void
+    {
+        for ($i = 1; $i <= 25; $i++) {
+            $this->conform->insert(['username' => "user{$i}", 'email' => "user{$i}@example.com"]);
+        }
+
+        $this->conform->withPageSize(7);
+
+        $ids = [];
+        foreach ($this->conform as $row) {
+            $ids[] = (int) $row['id'];
+        }
+
+        self::assertSame(range(1, 25), $ids);
+    }
+
+    public function testCursorResumeSkipsEarlierRows(): void
+    {
+        for ($i = 1; $i <= 6; $i++) {
+            $this->conform->insert(['username' => "user{$i}", 'email' => "user{$i}@example.com"]);
+        }
+
+        $this->conform->withPageSize(2)->withCursorStart(4);
+
+        $ids = [];
+        foreach ($this->conform as $row) {
+            $ids[] = (int) $row['id'];
+        }
+
+        self::assertSame([5, 6], $ids);
+    }
+
+    public function testCursorReportsTheRowBeingHandled(): void
+    {
+        $this->conform->bulkInsert([
+            ['username' => 'alice', 'email' => 'a@example.com'],
+            ['username' => 'bob', 'email' => 'b@example.com'],
+        ]);
+        $this->conform->withPageSize(1);
+
+        $observed = [];
+        foreach ($this->conform as $row) {
+            $observed[] = (int) $this->conform->cursor();
+        }
+
+        self::assertSame([1, 2], $observed);
+    }
+
+    // ==================== Transactions ====================
+
+    public function testTransactionCommitsOnSuccess(): void
+    {
+        $this->conform->withTransaction(function (): void {
+            $this->conform->insert(['username' => 'alice', 'email' => 'a@example.com']);
+            $this->conform->insert(['username' => 'bob', 'email' => 'b@example.com']);
+        });
+
+        self::assertSame(2, $this->conform->count());
+    }
+
+    public function testTransactionRollsBackAndRethrows(): void
+    {
+        try {
+            $this->conform->withTransaction(function (): void {
+                $this->conform->insert(['username' => 'alice', 'email' => 'a@example.com']);
+                throw new \RuntimeException('migration failed');
+            });
+            self::fail('Expected the exception to propagate');
+        } catch (\RuntimeException $e) {
+            self::assertSame('migration failed', $e->getMessage());
+        }
+
+        self::assertSame(0, $this->conform->count());
+    }
+}

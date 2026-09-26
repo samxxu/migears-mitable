@@ -2,24 +2,44 @@
 
 ![Version](https://img.shields.io/badge/version-2.0.0-blue)
 
-Minimalist single-table execution helper for one-off data migrations — DDL, CRUD, schema introspection, and cursor-based iteration in one class.
+Minimalist single-table execution helper for one-off data migrations — DDL, CRUD, schema introspection, and cursor-based iteration, with one class per SQL dialect.
 
-MiTable wraps a PDO connection around a single table. Point it at one table, reshape the schema, move and transform rows, then get out of the way. No query builder dependency — just pure PDO.
+A table class wraps a PDO connection around a single table. Point it at one table, reshape the schema, move and transform rows, then get out of the way. No query builder dependency — just pure PDO.
 
 > **Background**: miGears is the open-source successor of **TinyGears**, a
 > self-developed PHP framework. It was renamed and open-sourced recently because
 > the name *TinyGears* is already taken in the open-source community.
 
+## Structure
+
+| Piece | Role |
+|---|---|
+| `MiTableInterface` | The contract: everything a table implementation must do |
+| `TableOperations` | The dialect-agnostic half — CRUD, condition compilation, cursor iteration, transactions |
+| `MySQLTable` | MySQL / MariaDB dialect |
+| `SQLiteTable` | SQLite dialect |
+
+Pick the class that matches your connection:
+
+```php
+$users = new MySQLTable($pdo, 'users');   // MySQL or MariaDB
+$rows  = new SQLiteTable($pdo, 'rows');   // SQLite
+```
+
+The constructor rejects a connection whose driver does not match the class, so a mismatched pairing fails at once instead of emitting foreign SQL later. A script that must run on either can type-hint `MiTableInterface`.
+
+Adding a dialect means writing one class that uses `TableOperations` and fills in four hooks: the driver check, identifier quoting, primary-key detection and offset paging. Everything else comes from the trait.
+
 ## What this is, and what it is not
 
-MiTable is the **execution layer for migration scripts**, not a migration framework.
+This package is the **execution layer for migration scripts**, not a migration framework.
 
 It knows how to create a table, change its columns, write and transform its rows, and walk it without loading everything into memory. It does not know when a migration should run, whether it already ran, or how to undo it.
 
 | Layer | Responsibility |
 |---|---|
 | Migration runner (not in this package) | Migration registry, execution order, up/down, idempotency, automatic rollback, cross-table diffing |
-| **MiTable (this package)** | Single-table DDL, bulk writes, conditional updates and deletes, memory-safe iteration, schema introspection |
+| **This package** | Single-table DDL, bulk writes, conditional updates and deletes, memory-safe iteration, schema introspection |
 | Raw PDO (escape hatch) | Joins, multi-table writes, complex conditions — reach them through `getPdo()` |
 
 Keeping version management and orchestration outside is deliberate: they need global state and would destroy the readability that makes this class useful.
@@ -48,10 +68,10 @@ Requires: PHP 8.1+, ext-pdo.
 ## Quick Start
 
 ```php
-use MiGears\MiTable\MiTable;
+use MiGears\MiTable\MySQLTable;
 
 $pdo = new PDO('mysql:host=localhost;dbname=app', 'user', 'pass');
-$users = new MiTable($pdo, 'users');
+$users = new MySQLTable($pdo, 'users');
 
 // Create table
 $users->create([
@@ -286,7 +306,8 @@ Schema changes are not covered by this. MySQL commits implicitly around DDL, so 
 
 | Method | Description |
 |--------|-------------|
-| `new MiTable(PDO $pdo, string $tableName)` | Constructor |
+| `new MySQLTable(PDO $pdo, string $tableName)` | Constructor (MySQL / MariaDB) |
+| `new SQLiteTable(PDO $pdo, string $tableName)` | Constructor (SQLite) |
 | `getName()` | Get table name |
 | `getPdo()` | Get PDO instance |
 | **DDL** | |
@@ -336,18 +357,30 @@ Schema changes are not covered by this. MySQL commits implicitly around DDL, so 
 
 ## Driver Support
 
-MySQL/MariaDB and SQLite are the supported targets. DDL table options (`ENGINE`, `CHARSET`, `COLLATE`) and `AFTER` positioning apply to MySQL and are ignored or adapted on SQLite. `rowCount()` semantics vary by driver, as noted above.
+Each class drives one dialect and refuses the others:
 
-Introspection is implemented for MySQL (`SHOW COLUMNS`, `SHOW KEYS`, `SHOW INDEX`) and SQLite (`PRAGMA table_info`, `PRAGMA index_list`, `PRAGMA index_info`). On any other driver, `showColumns()` and `showIndexes()` throw a `RuntimeException` naming the driver, rather than reaching a SQLite-only statement and failing with a confusing syntax error. Everything else stays driver-agnostic: the iterator falls back to `OFFSET` paging and `exists()` probes the table directly. For production MySQL, `ext-pdo_mysql` is required.
+| | `MySQLTable` | `SQLiteTable` |
+|---|---|---|
+| Table options (`ENGINE`, `CHARSET`, `COLLATE`) | applied | not available, ignored |
+| `AFTER` column positioning, `USING` index type | supported | not available, ignored |
+| `renameColumn()` definition argument | required | ignored — SQLite keeps the existing type |
+| `modifyColumn()` | supported | throws |
+| `addPrimaryKey()` / `dropPrimaryKey()` | supported | throws |
+| `rename()` / `truncate()` / `renameColumn()` | supported | supported |
+| Introspection | `SHOW COLUMNS` / `SHOW INDEX` | `PRAGMA table_info` / `PRAGMA index_list` |
+
+SQLite cannot alter a table's primary key or a column's type in place, so those three operations throw a `RuntimeException` that points at the table-rebuild route, rather than emitting MySQL syntax that would surface as a bare syntax error. `SQLiteTable::truncate()` issues `DELETE FROM` and clears the `sqlite_sequence` counter, so it restarts the identity column the way MySQL's `TRUNCATE` does.
+
+`SQLiteTable` needs SQLite 3.35 or newer for `DROP COLUMN`. For production MySQL, `ext-pdo_mysql` is required.
 
 ## Design Philosophy
 
-miGears MiTable follows the miGears philosophy: **minimal, readable, and useful**.
+miGears miTable follows the miGears philosophy: **minimal, readable, and useful**.
 
-- **One class** — no abstracts, no traits, no interfaces
+- **Four files** — an interface, one shared trait, and one class per dialect; no abstract base class
 - **PDO only** — no query builder dependency
 - **Safe by default** — every data operation uses prepared statements
-- **Small enough to read** — roughly 560 lines of code
+- **Small enough to read** — roughly 760 lines of effective code, most of it the shared trait
 
 **What we don't do**:
 
@@ -363,13 +396,15 @@ miGears MiTable follows the miGears philosophy: **minimal, readable, and useful*
 
 ```bash
 composer test              # both suites
-composer test:unit         # SQLite only, no server needed
-composer test:integration  # MySQL/MariaDB
+composer test:unit         # SQLite + SQLite conformance, no server needed
+composer test:integration  # MySQL + MySQL conformance
 ```
 
-The unit suite runs against an in-memory SQLite database and needs nothing else. It covers DDL, CRUD, condition compilation, schema introspection, transactions, and iterator behaviour including cursor paging, fallback paging, and row removal mid-iteration.
+The tests come in two kinds. **Conformance tests** assert behaviour every dialect must share, and the same trait runs them twice — once on SQLite in the unit suite, once on MySQL in the integration suite. A behaviour only one dialect satisfies therefore fails. **Dialect tests** cover what is deliberately different: MySQL's `AFTER` positioning and `USING` index types, the three DDL verbs SQLite has no `ALTER` equivalent for, and SQLite's rowid-alias primary key.
 
-The integration suite exercises the MySQL-specific paths the unit suite cannot reach: `information_schema` existence checks, `SHOW COLUMNS` / `SHOW KEYS` introspection, MySQL table options, `AFTER` column positioning, `USING` index types, and MySQL's `rowCount` semantics. It resolves a server in this order:
+This split exists because of a real gap: previously the SQLite and MySQL suites tested different things, so "cross-driver" was never a verified property, and the DDL verbs with no SQLite coverage at all went unnoticed.
+
+The unit suite runs against an in-memory SQLite database and needs nothing else. The integration suite resolves a MySQL server in this order:
 
 | Order | Source | Example |
 |---|---|---|
@@ -392,20 +427,40 @@ MIT
 
 ![Version](https://img.shields.io/badge/version-2.0.0-blue)
 
-极简单表数据库操作助手，服务于一次性数据迁移 —— 一个类搞定 DDL、CRUD、结构反射和游标迭代。
+极简单表数据库操作助手，服务于一次性数据迁移 —— DDL、CRUD、结构反射与游标迭代，每个 SQL 方言一个实现类。
 
-MiTable 将 PDO 连接封装在单个表周围：指向一张表，改它的结构，搬运和转换其中的数据，然后功成身退。没有查询构建器依赖 —— 只有纯 PDO。
+表操作类将 PDO 连接封装在单个表周围：指向一张表，改它的结构，搬运和转换其中的数据，然后功成身退。没有查询构建器依赖 —— 只有纯 PDO。
+
+## 结构
+
+| 组成 | 职责 |
+|---|---|
+| `MiTableInterface` | 契约：一个表实现必须做到的全部事情 |
+| `TableOperations` | 与方言无关的那一半 —— CRUD、条件编译、游标迭代、事务 |
+| `MySQLTable` | MySQL / MariaDB 方言 |
+| `SQLiteTable` | SQLite 方言 |
+
+按你的连接选择对应类：
+
+```php
+$users = new MySQLTable($pdo, 'users');   // MySQL 或 MariaDB
+$rows  = new SQLiteTable($pdo, 'rows');   // SQLite
+```
+
+构造函数会拒绝驱动与类不匹配的连接，因此配错会在构造时立刻失败，而不是在后续悄悄发出别家的 SQL。需要在两种库上都能跑的脚本，可以类型标注为 `MiTableInterface`。
+
+新增一个方言，就是写一个使用 `TableOperations` 的类并实现四个钩子：驱动校验、标识符引用、主键探测、偏移分页。其余全部来自 trait。
 
 ## 这个包是什么，不是什么
 
-MiTable 是**迁移脚本的执行层**，不是迁移框架。
+这个包是**迁移脚本的执行层**，不是迁移框架。
 
 它知道如何建表、改列、写入与转换行数据、以及在不把整表读进内存的前提下遍历全表。它不关心迁移该在什么时候跑、是否已经跑过、以及如何撤销。
 
 | 层次 | 职责 |
 |---|---|
 | 迁移运行器（不在本包） | 迁移记录表、执行顺序、up/down、幂等、自动回滚、跨表结构比对 |
-| **MiTable（本包）** | 单表 DDL、批量写入、条件更新与删除、无内存遍历、结构反射 |
+| **本包** | 单表 DDL、批量写入、条件更新与删除、无内存遍历、结构反射 |
 | 裸 PDO（逃生通道） | JOIN、多表写入、复杂条件 —— 通过 `getPdo()` 直达 |
 
 把版本管理和编排留在包外是刻意的：它们需要全局状态，一旦塞进来就会毁掉这个类赖以立足的可读性。
@@ -434,10 +489,10 @@ composer require migears/mitable
 ## 快速开始
 
 ```php
-use MiGears\MiTable\MiTable;
+use MiGears\MiTable\MySQLTable;
 
 $pdo = new PDO('mysql:host=localhost;dbname=app', 'user', 'pass');
-$users = new MiTable($pdo, 'users');
+$users = new MySQLTable($pdo, 'users');
 
 // 创建表
 $users->create([
@@ -672,7 +727,8 @@ $users->withTransaction(function () use ($users) {
 
 | 方法 | 说明 |
 |------|------|
-| `new MiTable(PDO $pdo, string $tableName)` | 构造函数 |
+| `new MySQLTable(PDO $pdo, string $tableName)` | 构造函数（MySQL / MariaDB） |
+| `new SQLiteTable(PDO $pdo, string $tableName)` | 构造函数（SQLite） |
 | `getName()` | 获取表名 |
 | `getPdo()` | 获取 PDO 实例 |
 | **DDL** | |
@@ -722,18 +778,30 @@ $users->withTransaction(function () use ($users) {
 
 ## 驱动支持
 
-支持的目标是 MySQL/MariaDB 与 SQLite。DDL 表选项（`ENGINE`、`CHARSET`、`COLLATE`）和 `AFTER` 定位针对 MySQL 生效，在 SQLite 上被忽略或改写。`rowCount()` 的语义随驱动而异，见上文。
+每个类只驱动一种方言，并拒绝其他方言：
 
-结构反射分别针对 MySQL（`SHOW COLUMNS`、`SHOW KEYS`、`SHOW INDEX`）与 SQLite（`PRAGMA table_info`、`PRAGMA index_list`、`PRAGMA index_info`）实现。在其他驱动上，`showColumns()` 与 `showIndexes()` 会抛出 `RuntimeException` 并指明驱动名，而不是走到只有 SQLite 才有的语句上抛出令人困惑的语法错误。其余能力保持驱动无关：迭代器降级为 `OFFSET` 翻页，`exists()` 直接探测表。生产环境 MySQL 部署需要 `ext-pdo_mysql`。
+| | `MySQLTable` | `SQLiteTable` |
+|---|---|---|
+| 表选项（`ENGINE`、`CHARSET`、`COLLATE`） | 生效 | 不存在，忽略 |
+| `AFTER` 列定位、`USING` 索引类型 | 支持 | 不存在，忽略 |
+| `renameColumn()` 的 `$definition` 参数 | 必需 | 忽略 —— SQLite 保留原有类型 |
+| `modifyColumn()` | 支持 | 抛异常 |
+| `addPrimaryKey()` / `dropPrimaryKey()` | 支持 | 抛异常 |
+| `rename()` / `truncate()` / `renameColumn()` | 支持 | 支持 |
+| 结构反射 | `SHOW COLUMNS` / `SHOW INDEX` | `PRAGMA table_info` / `PRAGMA index_list` |
+
+SQLite 无法就地修改主键或列类型，因此上述三个方法会抛出 `RuntimeException`，并在消息里指明需要重建表，而不是发出 MySQL 语法、让使用者看到一个没头没尾的语法错误。`SQLiteTable::truncate()` 使用 `DELETE FROM` 并清空 `sqlite_sequence` 计数，因此和 MySQL 的 `TRUNCATE` 一样会重置自增列。
+
+`SQLiteTable` 的 `DROP COLUMN` 需要 SQLite 3.35 或更高版本。生产环境 MySQL 部署需要 `ext-pdo_mysql`。
 
 ## 设计哲学
 
-miGears MiTable 遵循 miGears 设计哲学：**极简、可读、实用**。
+miGears miTable 遵循 miGears 设计哲学：**极简、可读、实用**。
 
-- **一个类** — 没有抽象类、没有 trait、没有接口
+- **四个文件** — 一个接口、一个公用 trait、每个方言一个类；没有需要继承的抽象基类
 - **仅依赖 PDO** — 不依赖查询构建器
 - **默认安全** — 所有数据操作都使用预处理语句
-- **小到可以读完** — 约 560 行代码
+- **小到可以读完** — 约 760 行有效代码，其中大半是那个公用 trait
 
 **我们不做的事**：
 
@@ -749,13 +817,15 @@ miGears MiTable 遵循 miGears 设计哲学：**极简、可读、实用**。
 
 ```bash
 composer test              # 两个套件
-composer test:unit         # 仅 SQLite，无需任何服务
-composer test:integration  # MySQL/MariaDB
+composer test:unit         # SQLite + SQLite 一致性，无需任何服务
+composer test:integration  # MySQL + MySQL 一致性
 ```
 
-单元测试套件运行在内存 SQLite 上，不需要数据库服务。覆盖 DDL、CRUD、条件编译、结构反射、事务，以及迭代器行为（含游标翻页、降级翻页和迭代中途删行）。
+测试分两类。**一致性测试**断言所有方言必须一致的行为，同一个 trait 把它跑两遍——一遍在单元套件的 SQLite 上，一遍在集成套件的 MySQL 上。因此"只有一个方言满足"的行为必然失败。**方言测试**覆盖刻意不同的部分：MySQL 的 `AFTER` 定位与 `USING` 索引类型、SQLite 上三个无 `ALTER` 等价写法的 DDL 动词，以及 SQLite 的 rowid 别名主键。
 
-集成测试套件专门跑单元测试触及不到的 MySQL 专属路径：`information_schema` 存在性检查、`SHOW COLUMNS` / `SHOW KEYS` 结构反射、MySQL 建表选项、`AFTER` 列定位、`USING` 索引类型，以及 MySQL 的 `rowCount` 语义。它按以下顺序解析可用服务：
+这个划分源于一个真实缺口：此前 SQLite 与 MySQL 两个套件测的是**不同**的东西，所以"跨驱动"从来不是一条被验证过的性质，那些在 SQLite 上零覆盖的 DDL 动词也就一直没被发现。
+
+单元套件运行在内存 SQLite 上，不需要数据库服务。集成套件按以下顺序解析可用服务：
 
 | 顺序 | 来源 | 示例 |
 |---|---|---|

@@ -7,19 +7,20 @@ namespace MiGears\MiTable\Tests\Unit;
 use PDO;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
-use MiGears\MiTable\MiTable;
+use MiGears\MiTable\MiTableInterface;
+use MiGears\MiTable\SQLiteTable;
 
-#[CoversClass(MiTable::class)]
-final class MiTableTest extends TestCase
+#[CoversClass(SQLiteTable::class)]
+final class SQLiteTableTest extends TestCase
 {
     private PDO $pdo;
-    private MiTable $table;
+    private SQLiteTable $table;
 
     protected function setUp(): void
     {
         $this->pdo = new PDO('sqlite::memory:');
         $this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        $this->table = new MiTable($this->pdo, 'users');
+        $this->table = new SQLiteTable($this->pdo, 'users');
     }
 
     // --- DDL ---
@@ -118,7 +119,7 @@ final class MiTableTest extends TestCase
         self::assertFalse($columns['id']['nullable']);
     }
 
-    public function testAddColumnWithAfterIsIgnoredOnSqlite(): void
+    public function testAddColumnIgnoresAfterOnSqlite(): void
     {
         $this->createUsersTable();
 
@@ -126,6 +127,51 @@ final class MiTableTest extends TestCase
         $this->table->addColumn('phone', 'VARCHAR(20) NULL', 'username');
 
         self::assertArrayHasKey('phone', $this->table->showColumns());
+    }
+
+    // --- SQLite DDL that has no ALTER equivalent ---
+
+    public function testModifyColumnExplainsSqliteCannotAlterInPlace(): void
+    {
+        $this->createUsersTable();
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('SQLite cannot alter a column definition in place');
+
+        $this->table->modifyColumn('username', 'VARCHAR(120) NOT NULL');
+    }
+
+    public function testAddPrimaryKeyExplainsSqliteCannotAddOne(): void
+    {
+        $this->createUsersTable();
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('SQLite cannot add a primary key to an existing table');
+
+        $this->table->addPrimaryKey(['username']);
+    }
+
+    public function testDropPrimaryKeyExplainsSqliteCannotDropOne(): void
+    {
+        $this->createUsersTable();
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('SQLite cannot drop a primary key');
+
+        $this->table->dropPrimaryKey();
+    }
+
+    public function testTruncateResetsTheAutoincrementCounter(): void
+    {
+        $this->createUsersTable();
+        $this->table->insert(['username' => 'alice', 'email' => 'a@b.com']);
+        $this->table->insert(['username' => 'bob', 'email' => 'b@b.com']);
+
+        $this->table->truncate();
+
+        // MySQL's TRUNCATE restarts AUTO_INCREMENT; SQLite must do the same.
+        self::assertSame(0, $this->table->count());
+        self::assertSame('1', $this->table->insert(['username' => 'carol', 'email' => 'c@b.com']));
     }
 
     // --- Index introspection ---
@@ -171,24 +217,12 @@ final class MiTableTest extends TestCase
         self::assertSame([], $this->table->showIndexes());
     }
 
-    public function testShowColumnsOnUnsupportedDriverExplainsItself(): void
+    public function testConstructingWithAForeignDriverIsRejected(): void
     {
-        $table = new MiTable(new UnsupportedDriverPdo(), 'users');
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('SQLiteTable requires a SQLite connection; the "pgsql" driver was given');
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('showColumns() supports MySQL and SQLite; the "pgsql" driver is not supported');
-
-        $table->showColumns();
-    }
-
-    public function testShowIndexesOnUnsupportedDriverExplainsItself(): void
-    {
-        $table = new MiTable(new UnsupportedDriverPdo(), 'users');
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('showIndexes() supports MySQL and SQLite; the "pgsql" driver is not supported');
-
-        $table->showIndexes();
+        new SQLiteTable(new UnsupportedDriverPdo(), 'users');
     }
 
     public function testIndexMigrationIsIdempotentAcrossRuns(): void
@@ -927,7 +961,7 @@ final class MiTableTest extends TestCase
 
     public function testVersionConstant(): void
     {
-        self::assertSame('2.0.0', MiTable::VERSION);
+        self::assertSame('2.0.0', MiTableInterface::VERSION);
     }
 
     // --- Helpers ---
