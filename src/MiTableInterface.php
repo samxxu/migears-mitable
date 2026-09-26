@@ -22,6 +22,18 @@ interface MiTableInterface extends Iterator
 {
     public const VERSION = '2.0.0';
 
+    /**
+     * Operators accepted in a `[operator, value]` condition.
+     *
+     * Declared on the contract rather than in the shared trait for two reasons:
+     * a trait cannot carry a constant before PHP 8.2, and the accepted operator
+     * set is part of what every dialect promises.
+     */
+    public const OPERATORS = [
+        '=', '!=', '<>', '>', '>=', '<', '<=', 'like', 'not like',
+        'in', 'not in', 'between', 'not between',
+    ];
+
     /** Get the table name. */
     public function getName(): string;
 

@@ -22,12 +22,6 @@ use InvalidArgumentException;
  */
 trait TableOperations
 {
-    /** Operators accepted in a `[operator, value]` where condition. */
-    private const OPERATORS = [
-        '=', '!=', '<>', '>', '>=', '<', '<=', 'like', 'not like',
-        'in', 'not in', 'between', 'not between',
-    ];
-
     private readonly PDO $pdo;
     private readonly string $table;
 
@@ -465,7 +459,7 @@ trait TableOperations
         // A recognised operator name can only mean an [operator, value] tuple, so
         // anything else of that shape is a mistake. Falling through would read it
         // as a list of literal values and silently match the wrong rows.
-        if ($operator !== null && in_array($operator, self::OPERATORS, true)) {
+        if ($operator !== null && in_array($operator, MiTableInterface::OPERATORS, true)) {
             if (count($condition) !== 2) {
                 throw new InvalidArgumentException(sprintf(
                     'Column "%s" got a %d-element condition starting with the "%s" operator; '
