@@ -30,6 +30,8 @@ use InvalidArgumentException;
  *       'email' => 'VARCHAR(255) NOT NULL',
  *   ]);
  *   $id = $table->insert(['username' => 'alice', 'email' => 'alice@example.com']);
+ *
+ * @implements \Iterator<int, array<string, mixed>>
  */
 class MiTable implements Iterator
 {
@@ -47,6 +49,7 @@ class MiTable implements Iterator
     // Iterator state
     private int $iterPageSize = 100;
     private int $iterPosition = 0;
+    /** @var list<array<string, mixed>> */
     private array $iterPage = [];
     private int $iterIndexInPage = 0;
     private bool $iterDone = false;
@@ -213,7 +216,11 @@ class MiTable implements Iterator
 
     // --- Index operations ---
 
-    /** Add an index. */
+    /**
+     * Add an index.
+     *
+     * @param list<string> $columns
+     */
     public function addIndex(string $name, array $columns, string $type = ''): void
     {
         $cols = implode(', ', array_map(fn($c) => "`{$c}`", $columns));
@@ -236,7 +243,11 @@ class MiTable implements Iterator
         }
     }
 
-    /** Add a unique index. */
+    /**
+     * Add a unique index.
+     *
+     * @param list<string> $columns
+     */
     public function addUniqueIndex(string $name, array $columns): void
     {
         $cols = implode(', ', array_map(fn($c) => "`{$c}`", $columns));
@@ -248,7 +259,11 @@ class MiTable implements Iterator
         }
     }
 
-    /** Add a primary key. */
+    /**
+     * Add a primary key.
+     *
+     * @param list<string> $columns
+     */
     public function addPrimaryKey(array $columns): void
     {
         $cols = implode(', ', array_map(fn($c) => "`{$c}`", $columns));
@@ -609,7 +624,11 @@ class MiTable implements Iterator
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    /** Count rows matching conditions. */
+    /**
+     * Count rows matching conditions.
+     *
+     * @param array<string, mixed> $where Column => condition (see buildCondition)
+     */
     public function count(array $where = []): int
     {
         [$clause, $params] = $this->buildWhere($where);
@@ -739,7 +758,8 @@ class MiTable implements Iterator
     /**
      * Compile a value list into IN / NOT IN with one bound parameter per value.
      *
-     * @param list<mixed> $values
+     * @param array<int|string, mixed> $values 实际入参为数组（调用点仅以 is_array() 收窄，未保证顺序键），
+     *                                          故用 array_values() 归一为顺序下标再拼接占位符。
      * @param array<string, mixed> $params Accumulated bound parameters (by reference)
      */
     private function buildListCondition(string $col, string $column, array $values, string $prefix, array &$params, bool $negate): string
@@ -831,6 +851,8 @@ class MiTable implements Iterator
      * Recording the cursor here (rather than in next()) means cursor() reports
      * the row the caller is currently handling. A run that dies while handling
      * a row therefore resumes on that same row instead of skipping it.
+     *
+     * @return array<string, mixed>
      */
     public function current(): array
     {
