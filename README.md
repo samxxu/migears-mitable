@@ -146,7 +146,7 @@ $orders->where(['created_at' => ['between', ['2024-01-01', '2024-12-31']]], 'id 
 $users->where(['phone' => null]);
 ```
 
-An empty list throws `InvalidArgumentException` rather than silently matching nothing, so a buggy condition cannot quietly turn into a full-table update.
+An empty list throws `InvalidArgumentException` rather than silently matching nothing, so a buggy condition cannot quietly turn into a full-table update. A condition that *starts* with an operator name must be a two-element `[operator, value]` pair; anything else of that shape throws instead of being reinterpreted as a list of values. That means a list whose first value happens to be an operator name needs the explicit form — `['in', ['in', 'out']]`, not `['in', 'out']`.
 
 This is intentionally not a query builder. Conditions stay flat: no nesting, no groups, no joins. When a condition no longer fits, that is the signal to use `getPdo()` and write the SQL directly.
 
@@ -354,6 +354,9 @@ Schema changes are not covered by this. MySQL commits implicitly around DDL, so 
 - **`delete([])` deletes every row**, matching the previous behaviour. Pass conditions deliberately.
 - **`where()`'s `$orderBy` argument is raw SQL** and is not parameter bound. Never interpolate user input into it.
 - **Iteration reads rows in pages**, so a row deleted after its page was loaded is still yielded.
+- **`bulkInsert()` requires every row to carry the same columns.** Ragged input throws with the row index and the difference, rather than dropping a later row's extra column or binding null for one it lacks.
+- **The connection must be in `PDO::ERRMODE_EXCEPTION`.** No write path inspects the return of `prepare()` or `execute()`, so a silent connection would turn a failed write into an unnoticed no-op; the constructor rejects one instead.
+- **`current()` throws an `OutOfBoundsException`** when the iterator is not sitting on a row, rather than emitting a PHP warning and a `TypeError`.
 
 ## Driver Support
 
@@ -567,7 +570,7 @@ $orders->where(['created_at' => ['between', ['2024-01-01', '2024-12-31']]], 'id 
 $users->where(['phone' => null]);
 ```
 
-空列表会抛出 `InvalidArgumentException`，而不是静默地匹配不到任何行 —— 一个写错的条件不该悄悄变成全表更新。
+空列表会抛出 `InvalidArgumentException`，而不是静默地匹配不到任何行 —— 一个写错的条件不该悄悄变成全表更新。**以操作符名开头的条件必须是两元素的 `[operator, value]` 对**；同形状的其他写法会抛异常，而不会被重新理解成一串取值。因此，当列表的首个取值恰好是操作符名时，需要写显式形式 —— `['in', ['in', 'out']]`，而不是 `['in', 'out']`。
 
 这里刻意不做查询构建器。条件保持扁平：没有嵌套、没有分组、没有 JOIN。当某个条件已经装不下时，那正是改用 `getPdo()` 直接写 SQL 的信号。
 
@@ -775,6 +778,9 @@ $users->withTransaction(function () use ($users) {
 - **`delete([])` 会删除全部行**，与既有行为一致。请有意识地传条件。
 - **`where()` 的 `$orderBy` 参数是裸 SQL**，不做参数绑定。绝不要把用户输入拼进这里。
 - **迭代按页读取**，因此某个行所在页已加载后它才被删除，该行仍会被返回。
+- **`bulkInsert()` 要求每行携带相同的列。** 参差输入会抛异常并指出行号与差异，而不是丢弃后续行多出的列、或为缺失的列绑定 null。
+- **连接必须处于 `PDO::ERRMODE_EXCEPTION`。** 所有写路径都不检查 `prepare()` / `execute()` 的返回值，静默模式会让写失败变成无人察觉的空操作；构造函数会直接拒绝这种连接。
+- **`current()` 在迭代器未落在某一行时会抛 `OutOfBoundsException`**，而不是先发一条 PHP 警告再抛 `TypeError`。
 
 ## 驱动支持
 

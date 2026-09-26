@@ -225,6 +225,17 @@ final class SQLiteTableTest extends TestCase
         new SQLiteTable(new UnsupportedDriverPdo(), 'users');
     }
 
+    public function testConstructingWithASilentConnectionIsRejected(): void
+    {
+        $pdo = new PDO('sqlite::memory:');
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_SILENT);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('requires PDO::ERRMODE_EXCEPTION');
+
+        new SQLiteTable($pdo, 'users');
+    }
+
     public function testIndexMigrationIsIdempotentAcrossRuns(): void
     {
         $this->createUsersTable();

@@ -214,6 +214,43 @@ trait TableConformanceTests
         self::assertSame(0, $this->conform->bulkInsert([]));
     }
 
+    public function testBulkInsertRejectsARowWithAnExtraColumn(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('unexpected [phone]');
+
+        $this->conform->bulkInsert([
+            ['username' => 'alice', 'email' => 'a@example.com'],
+            ['username' => 'bob', 'email' => 'b@example.com', 'phone' => '123'],
+        ]);
+    }
+
+    public function testBulkInsertRejectsARowWithAMissingColumn(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('missing [email]');
+
+        $this->conform->bulkInsert([
+            ['username' => 'alice', 'email' => 'a@example.com'],
+            ['username' => 'bob'],
+        ]);
+    }
+
+    public function testBulkInsertRejectsRaggedRowsBeforeWriting(): void
+    {
+        try {
+            $this->conform->bulkInsert([
+                ['username' => 'alice', 'email' => 'a@example.com'],
+                ['username' => 'bob'],
+            ]);
+            self::fail('Expected the ragged batch to be rejected');
+        } catch (\InvalidArgumentException) {
+        }
+
+        // The rejection happens before any SQL is built, so nothing is written.
+        self::assertSame(0, $this->conform->count());
+    }
+
     public function testUpdate(): void
     {
         $id = $this->conform->insert(['username' => 'alice', 'email' => 'old@example.com']);
@@ -264,6 +301,32 @@ trait TableConformanceTests
         self::assertSame(3, $this->conform->count(['username' => ['in', ['alice', 'bob', 'carol']]]));
     }
 
+    public function testMalformedOperatorConditionIsRejected(): void
+    {
+        $this->conform->bulkInsert([
+            ['username' => 'alice', 'email' => 'a@example.com'],
+            ['username' => 'bob', 'email' => 'b@example.com'],
+        ]);
+
+        // This used to be read as `id IN ('=', 1, 2)` and quietly match two rows.
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('an operator condition is [operator, value]');
+
+        $this->conform->where(['id' => ['=', 1, 2]]);
+    }
+
+    public function testInListWhoseFirstValueLooksLikeAnOperator(): void
+    {
+        $this->conform->bulkInsert([
+            ['username' => 'in', 'email' => 'a@example.com'],
+            ['username' => 'out', 'email' => 'b@example.com'],
+        ]);
+
+        // The first element decides the shape, so ['in', 'out'] would be read as
+        // the `in` operator; the explicit form is how a caller asks for values.
+        self::assertSame(2, $this->conform->count(['username' => ['in', ['in', 'out']]]));
+    }
+
     // ==================== Iteration ====================
 
     public function testCursorIterationWalksEveryRowInOrder(): void
@@ -312,6 +375,15 @@ trait TableConformanceTests
         }
 
         self::assertSame([1, 2], $observed);
+    }
+
+    public function testCurrentThrowsBeforeRewind(): void
+    {
+        // Used to emit an "Undefined array key" warning and then a TypeError.
+        $this->expectException(\OutOfBoundsException::class);
+        $this->expectExceptionMessage('call rewind() first');
+
+        $this->conform->current();
     }
 
     // ==================== Transactions ====================

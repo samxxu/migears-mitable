@@ -83,9 +83,28 @@ trait TableOperations
     public function __construct(PDO $pdo, string $tableName)
     {
         $this->assertDialect($pdo);
+        $this->assertExceptionMode($pdo);
 
         $this->pdo = $pdo;
         $this->table = $tableName;
+    }
+
+    /**
+     * Refuse a connection that would swallow write failures.
+     *
+     * No write path inspects the return of prepare() or execute(), so under
+     * ERRMODE_SILENT a failed write would return false and go unnoticed — and
+     * the subsequent method call dies with an Error that cannot be caught as a
+     * PDOException. Requiring the mode turns that into a clear setup failure.
+     */
+    private function assertExceptionMode(PDO $pdo): void
+    {
+        if ($pdo->getAttribute(PDO::ATTR_ERRMODE) !== PDO::ERRMODE_EXCEPTION) {
+            throw new InvalidArgumentException(
+                'A table requires PDO::ERRMODE_EXCEPTION; the given connection uses ERRMODE_SILENT or '
+                . 'ERRMODE_WARNING, which would turn a failed write into a silent no-op'
+            );
+        }
     }
 
     /** Get the table name. */
@@ -205,6 +224,8 @@ trait TableOperations
             return 0;
         }
 
+        $this->assertUniformColumns($rows);
+
         $columns = array_keys($rows[0]);
         $cols = $this->columnList(array_map(strval(...), $columns));
         $t = $this->quoteIdentifier($this->table);
@@ -224,6 +245,37 @@ trait TableOperations
         $stmt->execute($params);
 
         return $stmt->rowCount();
+    }
+
+    /**
+     * Reject ragged rows before any SQL is built.
+     *
+     * Deriving the column set from the first row alone would silently drop a
+     * later row's extra column, and bind null for a column it lacks — both are
+     * data loss with no error to notice. A migration tool must not guess which
+     * of the two the caller meant.
+     *
+     * @param list<array<string, mixed>> $rows
+     */
+    private function assertUniformColumns(array $rows): void
+    {
+        $first = $rows[0];
+
+        foreach ($rows as $index => $row) {
+            $absent = array_diff_key($first, $row);
+            $unexpected = array_diff_key($row, $first);
+
+            if ($absent === [] && $unexpected === []) {
+                continue;
+            }
+
+            throw new InvalidArgumentException(sprintf(
+                'bulkInsert() row %d does not match the columns of the first row%s%s',
+                $index,
+                $absent === [] ? '' : '; missing [' . implode(', ', array_keys($absent)) . ']',
+                $unexpected === [] ? '' : '; unexpected [' . implode(', ', array_keys($unexpected)) . ']'
+            ));
+        }
     }
 
     /**
@@ -385,6 +437,10 @@ trait TableOperations
      * Everything stays a single column => condition pair. For anything beyond
      * this — joins, functions, nested groups — use getPdo() and write raw SQL.
      *
+     * A bare list is matched with IN. The first element decides the shape, so a
+     * list whose first value happens to be an operator name must be written
+     * explicitly: `['in', ['in', 'out']]` rather than `['in', 'out']`.
+     *
      * @param array<string, mixed> $params Accumulated bound parameters (by reference)
      */
     private function buildCondition(string $column, mixed $condition, string $prefix, array &$params): string
@@ -406,8 +462,20 @@ trait TableOperations
 
         $operator = is_string($condition[0] ?? null) ? strtolower(trim($condition[0])) : null;
 
-        // [operator, value] tuple
-        if ($operator !== null && count($condition) === 2 && in_array($operator, self::OPERATORS, true)) {
+        // A recognised operator name can only mean an [operator, value] tuple, so
+        // anything else of that shape is a mistake. Falling through would read it
+        // as a list of literal values and silently match the wrong rows.
+        if ($operator !== null && in_array($operator, self::OPERATORS, true)) {
+            if (count($condition) !== 2) {
+                throw new InvalidArgumentException(sprintf(
+                    'Column "%s" got a %d-element condition starting with the "%s" operator; '
+                    . 'an operator condition is [operator, value]',
+                    $column,
+                    count($condition),
+                    $operator
+                ));
+            }
+
             return $this->buildOperatorCondition($col, $column, $operator, $condition[1], $prefix, $params);
         }
 
@@ -558,6 +626,13 @@ trait TableOperations
      */
     public function current(): array
     {
+        if (!array_key_exists($this->iterIndexInPage, $this->iterPage)) {
+            throw new \OutOfBoundsException(
+                'current() is only valid while the iterator sits on a row; '
+                . 'call rewind() first, or guard the read with valid()'
+            );
+        }
+
         $row = $this->iterPage[$this->iterIndexInPage];
 
         if ($this->iterKey !== null && array_key_exists($this->iterKey, $row)) {

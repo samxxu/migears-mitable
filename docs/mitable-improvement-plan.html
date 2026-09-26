@@ -561,7 +561,7 @@
         <section id="remaining">
           <h2>剩余工作</h2>
           <p>
-            定位成立、场景全覆盖、验证闭环。代码评审另开出了一批待办，记录在 <code>ISSUES.md</code>：参差行的 <code>bulkInsert()</code> 会静默丢列或写入 null、畸形的条件元组被静默编译成 <code>IN</code>、<code>current()</code> 缺越界守卫、写方法隐含依赖 <code>PDO::ERRMODE_EXCEPTION</code>。这四项都位于与方言结构无关的那一半代码里，本轮未处理。除此之外还有下面三项。
+            定位成立、场景全覆盖、验证闭环。代码评审开出的另外四条也已处理：参差行的 <code>bulkInsert()</code> 现在抛异常并指出差异，而不是静默丢列或写 null；畸形的条件元组不再被误读成 <code>IN</code>，而是报错；<code>current()</code> 越界时改为抛 <code>OutOfBoundsException</code>；构造函数拒绝非 <code>ERRMODE_EXCEPTION</code> 的连接，堵掉了"写失败静默丢空"这条通道。四条都在与方言无关的那一半代码里，因此一致性套件在两个驱动上都做了验证，且均未产生 PHP 警告。除此之外还有下面三项。
           </p>
           <div class="improvements">
             <div class="improvement">
