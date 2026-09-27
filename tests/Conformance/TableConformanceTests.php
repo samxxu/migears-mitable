@@ -251,6 +251,47 @@ trait TableConformanceTests
         self::assertSame(0, $this->conform->count());
     }
 
+    public function testInsertWorksWithHyphenatedColumnName(): void
+    {
+        // PDO placeholders built from the raw column name would break on a
+        // hyphen (":user-id" gets parsed as ":user" minus "-id"). Synthetic
+        // placeholders (:i0, :i1, …) make any legal column name work.
+        $table = $this->makeTableWith('user-id', 'VARCHAR(20) NOT NULL');
+        $table->insert(['user-id' => 'abc-123']);
+
+        self::assertSame('abc-123', $table->find(['user-id' => 'abc-123'])['user-id']);
+    }
+
+    public function testBulkInsertWorksWithHyphenatedColumnName(): void
+    {
+        $table = $this->makeTableWith('user-id', 'VARCHAR(20) NOT NULL');
+        $table->bulkInsert([
+            ['user-id' => 'abc-1'],
+            ['user-id' => 'abc-2'],
+        ]);
+
+        self::assertSame(2, $table->count());
+    }
+
+    /**
+     * Build a one-column table for tests that need a column whose name is not
+     * in the standard fixture (e.g. hyphenated, spaced).
+     */
+    private function makeTableWith(string $columnName, string $definition): MiTableInterface
+    {
+        $name = 'conform_special_' . bin2hex(random_bytes(4));
+        $class = $this->conform::class;
+        $table = new $class($this->conform->getPdo(), $name);
+        $table->create([
+            'id' => $this->conform instanceof \MiGears\MiTable\SQLiteTable
+                ? 'INTEGER PRIMARY KEY AUTOINCREMENT'
+                : 'INT UNSIGNED AUTO_INCREMENT PRIMARY KEY',
+            $columnName => $definition,
+        ]);
+
+        return $table;
+    }
+
     public function testUpdate(): void
     {
         $id = $this->conform->insert(['username' => 'alice', 'email' => 'old@example.com']);
@@ -325,6 +366,27 @@ trait TableConformanceTests
         // The first element decides the shape, so ['in', 'out'] would be read as
         // the `in` operator; the explicit form is how a caller asks for values.
         self::assertSame(2, $this->conform->count(['username' => ['in', ['in', 'out']]]));
+    }
+
+    public function testUnrecognisedSymbolOperatorIsRejectedWithHint(): void
+    {
+        // A short all-symbol string like "==", "===" or "<=>" is almost certainly
+        // a typo, not a real value. Instead of silently compiling it as IN (and
+        // returning nothing), we point the caller at the supported operators.
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('not a recognised operator');
+
+        $this->conform->where(['id' => ['==', 1]]);
+    }
+
+    public function testUnrecognisedSymbolOperatorStillAllowsExplicitIn(): void
+    {
+        // The heuristic only fires on the implicit-IN form. If the caller
+        // explicitly writes ['in', [...]] it goes through unchallenged, even
+        // when one of the values happens to be a symbol-only string.
+        $this->conform->insert(['username' => '==', 'email' => 'a@example.com']);
+
+        self::assertSame(1, $this->conform->count(['username' => ['in', ['==', '!=']]]));
     }
 
     // ==================== Iteration ====================

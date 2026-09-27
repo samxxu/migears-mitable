@@ -47,6 +47,9 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist
 
+      - name: Static analysis (PHPStan level 6)
+        run: composer analyse --no-progress
+
       - name: Unit tests (SQLite in memory)
         run: composer test:unit -- --fail-on-skipped
 

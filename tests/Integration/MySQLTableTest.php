@@ -60,6 +60,20 @@ final class MySQLTableTest extends MySqlTestCase
         self::assertSame('utf8mb4_general_ci', $collation);
     }
 
+    public function testCreateRejectsUnsafeEngineCharsetCollate(): void
+    {
+        // Engine, charset and collation are spliced raw into the DDL (they are
+        // not backtick-quoted because the SQL grammar does not use backticks
+        // there). The assertIdentifier guard keeps punctuation and spaces out.
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('engine must contain only letters, digits and underscores');
+
+        $this->table->create(
+            ['id' => 'INT UNSIGNED NOT NULL PRIMARY KEY'],
+            'InnoDB; DROP TABLE users --'
+        );
+    }
+
     public function testExistsReadsInformationSchema(): void
     {
         self::assertFalse($this->table->exists());
@@ -284,6 +298,16 @@ final class MySQLTableTest extends MySqlTestCase
         $this->table->addIndex('idx_username', ['username'], 'BTREE');
 
         self::assertTrue($this->indexExists('idx_username'));
+    }
+
+    public function testAddIndexRejectsUnsafeType(): void
+    {
+        $this->createUsersTable();
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('index type must contain only letters, digits and underscores');
+
+        $this->table->addIndex('idx_username', ['username'], 'BTREE; DROP TABLE users --');
     }
 
     public function testAddUniqueIndexIsActuallyUnique(): void

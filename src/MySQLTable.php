@@ -42,7 +42,9 @@ class MySQLTable implements MiTableInterface
 
     protected function quoteIdentifier(string $name): string
     {
-        return "`{$name}`";
+        // Double any embedded backticks — the MySQL-standard escape — so a name
+        // containing a backtick cannot break out of the quoted identifier.
+        return '`' . str_replace('`', '``', $name) . '`';
     }
 
     /**
@@ -74,12 +76,36 @@ class MySQLTable implements MiTableInterface
 
     // ==================== DDL ====================
 
+    /**
+     * Reject a DDL option that contains characters outside the safe set.
+     *
+     * Engine, charset, collation and index-type names are spliced raw into
+     * DDL (they are not identifier-quoted because the SQL grammar does not
+     * use backticks there). This check keeps punctuation, spaces and quotes
+     * out, so a typo cannot turn into a syntax break or worse.
+     *
+     * @throws InvalidArgumentException if the value contains anything other
+     *         than letters, digits and underscores
+     */
+    private function assertIdentifier(string $what, string $value): void
+    {
+        if (!preg_match('/^[A-Za-z0-9_]+$/', $value)) {
+            throw new InvalidArgumentException(
+                "{$what} must contain only letters, digits and underscores; \"{$value}\" was given"
+            );
+        }
+    }
+
     public function create(
         array $columns,
         string $engine = 'InnoDB',
         string $charset = 'utf8mb4',
         string $collate = 'utf8mb4_unicode_ci'
     ): void {
+        $this->assertIdentifier('engine', $engine);
+        $this->assertIdentifier('charset', $charset);
+        $this->assertIdentifier('collate', $collate);
+
         $t = $this->quoteIdentifier($this->getName());
         $defs = $this->columnDefinitions($columns);
 
@@ -144,6 +170,10 @@ class MySQLTable implements MiTableInterface
 
     public function addIndex(string $name, array $columns, string $type = ''): void
     {
+        if ($type !== '') {
+            $this->assertIdentifier('index type', $type);
+        }
+
         $t = $this->quoteIdentifier($this->getName());
         $idx = $this->quoteIdentifier($name);
         $cols = $this->columnList($columns);

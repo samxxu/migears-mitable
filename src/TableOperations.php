@@ -192,14 +192,24 @@ trait TableOperations
     public function insert(array $data): string
     {
         $columns = array_keys($data);
-        $placeholders = array_map(fn($c) => ":{$c}", $columns);
-
         $cols = $this->columnList(array_map(strval(...), $columns));
-        $vals = implode(', ', $placeholders);
         $t = $this->quoteIdentifier($this->table);
 
+        // Synthetic placeholders (:i0, :i1, …) so column names with hyphens,
+        // spaces or other punctuation never reach PDO's placeholder parser.
+        $placeholders = [];
+        $params = [];
+        $i = 0;
+        foreach ($data as $value) {
+            $name = 'i' . $i++;
+            $placeholders[] = ':' . $name;
+            $params[$name] = $value;
+        }
+
+        $vals = implode(', ', $placeholders);
+
         $stmt = $this->pdo->prepare("INSERT INTO {$t} ({$cols}) VALUES ({$vals})");
-        $stmt->execute($data);
+        $stmt->execute($params);
 
         return $this->pdo->lastInsertId();
     }
@@ -221,17 +231,21 @@ trait TableOperations
         $this->assertUniformColumns($rows);
 
         $columns = array_keys($rows[0]);
+        $colCount = count($columns);
         $cols = $this->columnList(array_map(strval(...), $columns));
         $t = $this->quoteIdentifier($this->table);
 
         $valueSets = [];
         $params = [];
-        foreach ($rows as $i => $row) {
-            $placeholders = array_map(fn($c) => ":{$c}_{$i}", $columns);
-            $valueSets[] = '(' . implode(', ', $placeholders) . ')';
-            foreach ($columns as $c) {
-                $params["{$c}_{$i}"] = $row[$c];
+        $seq = 0;
+        foreach ($rows as $row) {
+            $placeholders = [];
+            for ($j = 0; $j < $colCount; $j++) {
+                $name = 'i' . $seq++;
+                $placeholders[] = ':' . $name;
+                $params[$name] = $row[$columns[$j]];
             }
+            $valueSets[] = '(' . implode(', ', $placeholders) . ')';
         }
 
         $sql = "INSERT INTO {$t} ({$cols}) VALUES " . implode(', ', $valueSets);
@@ -471,6 +485,26 @@ trait TableOperations
             }
 
             return $this->buildOperatorCondition($col, $column, $operator, $condition[1], $prefix, $params);
+        }
+
+        // Heuristic: the first element looks like a misspelled operator — a short
+        // string made entirely of punctuation (e.g. "==", "===", "<=>", "=>").
+        // Such a value is extremely unlikely to be a real column value, and
+        // silently turning it into an IN query returns nothing with no hint
+        // about what went wrong. Point the caller at the typo instead.
+        if (
+            $operator !== null
+            && strlen($operator) <= 5
+            && preg_match('/^[^\p{L}\p{N}\s]+$/u', $operator)
+        ) {
+            throw new InvalidArgumentException(sprintf(
+                'Column "%s" — "%s" is not a recognised operator and does not look like a value; '
+                . 'did you mean one of: ' . implode(', ', MiTableInterface::OPERATORS) . '? '
+                . 'If this is really a value, use the explicit IN form: ["in", ["%s", ...]]',
+                $column,
+                $operator,
+                $operator
+            ));
         }
 
         // Bare list => IN

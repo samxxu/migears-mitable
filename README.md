@@ -55,7 +55,7 @@ The reasoning behind this split, the migration scenarios the class is built for,
 - **Cursor iteration** — `foreach` over millions of rows with a stable order, paging by primary key instead of `OFFSET`
 - **Resumable scans** — `cursor()` and `withCursorStart()` let an interrupted run pick up where it stopped, without skipping or repeating a row
 - **Transactions** — an optional `withTransaction()` wrapper; the boundary stays the caller's
-- **Cross-driver** — MySQL/MariaDB and SQLite, with a graceful generic fallback
+- **Cross-driver** — MySQL/MariaDB and SQLite, one class per dialect; add a dialect by implementing four hooks
 
 ## Installation
 
@@ -383,7 +383,7 @@ miGears miTable follows the miGears philosophy: **minimal, readable, and useful*
 - **Four files** — an interface, one shared trait, and one class per dialect; no abstract base class
 - **PDO only** — no query builder dependency
 - **Safe by default** — every data operation uses prepared statements
-- **Small enough to read** — roughly 760 lines of effective code, most of it the shared trait
+- **Small enough to read** — roughly 800 lines of effective code, about half in the shared trait
 
 **What we don't do**:
 
@@ -479,7 +479,7 @@ $rows  = new SQLiteTable($pdo, 'rows');   // SQLite
 - **游标迭代** — `foreach` 遍历百万行且顺序稳定，按主键翻页而非 `OFFSET`
 - **可续跑的扫描** — `cursor()` 与 `withCursorStart()` 让中断的遍历从断点继续，不跳行也不重复
 - **事务** — 可选的 `withTransaction()` 包装；事务边界仍归调用方
-- **跨驱动** — MySQL/MariaDB 与 SQLite，其他驱动优雅降级
+- **跨驱动** — MySQL/MariaDB 与 SQLite，每个方言一个类；实现四个钩子即可新增方言
 
 ## 安装
 
@@ -807,7 +807,7 @@ miGears miTable 遵循 miGears 设计哲学：**极简、可读、实用**。
 - **四个文件** — 一个接口、一个公用 trait、每个方言一个类；没有需要继承的抽象基类
 - **仅依赖 PDO** — 不依赖查询构建器
 - **默认安全** — 所有数据操作都使用预处理语句
-- **小到可以读完** — 约 760 行有效代码，其中大半是那个公用 trait
+- **小到可以读完** — 约 800 行有效代码，其中约一半是公用 trait
 
 **我们不做的事**：
 

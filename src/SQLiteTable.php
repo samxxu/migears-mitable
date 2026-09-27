@@ -53,7 +53,10 @@ class SQLiteTable implements MiTableInterface
 
     protected function quoteIdentifier(string $name): string
     {
-        return "`{$name}`";
+        // Double any embedded backticks. SQLite accepts backtick-quoted
+        // identifiers (MySQL-compatibility syntax) and uses the same
+        // double-the-quote escape rule.
+        return '`' . str_replace('`', '``', $name) . '`';
     }
 
     /**
