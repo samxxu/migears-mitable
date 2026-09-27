@@ -273,6 +273,42 @@ trait TableConformanceTests
         self::assertSame(2, $table->count());
     }
 
+    public function testInsertWorksWithASpacedColumnName(): void
+    {
+        // P2-2: placeholders are synthetic (:i0, :i1, …), so even a column name
+        // that PDO would refuse as a placeholder works everywhere.
+        $table = $this->makeTableWith('user name', 'VARCHAR(20) NOT NULL');
+        $table->insert(['user name' => 'alice']);
+
+        self::assertSame('alice', $table->find(['user name' => 'alice'])['user name']);
+    }
+
+    public function testNamesWithEmbeddedBackticksAreEscaped(): void
+    {
+        // P2-1: quoteIdentifier() doubles an embedded backtick. Without that a
+        // name would close its own quoting and the remainder would be parsed as
+        // SQL — a syntax error at best, an injection at worst.
+        $name = 'conform`tick_' . bin2hex(random_bytes(4));
+        $class = $this->conform::class;
+        $table = new $class($this->conform->getPdo(), $name);
+        $table->create([
+            'id' => $this->conform instanceof \MiGears\MiTable\SQLiteTable
+                ? 'INTEGER PRIMARY KEY AUTOINCREMENT'
+                : 'INT UNSIGNED AUTO_INCREMENT PRIMARY KEY',
+            'or`der' => 'VARCHAR(20) NOT NULL',
+        ]);
+
+        try {
+            $table->insert(['or`der' => 'first']);
+
+            self::assertTrue($table->exists());
+            self::assertSame(1, $table->count());
+            self::assertSame('first', $table->find(['or`der' => 'first'])['or`der']);
+        } finally {
+            $table->drop();
+        }
+    }
+
     /**
      * Build a one-column table for tests that need a column whose name is not
      * in the standard fixture (e.g. hyphenated, spaced).
