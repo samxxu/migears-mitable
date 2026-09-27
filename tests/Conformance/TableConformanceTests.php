@@ -425,6 +425,31 @@ trait TableConformanceTests
         self::assertSame(1, $this->conform->count(['username' => ['in', ['==', '!=']]]));
     }
 
+    public function testInListRejectsANonScalarElement(): void
+    {
+        // A bare list whose element is itself an array cannot be bound as a
+        // parameter. It used to reach PDO, which emitted an "Array to string
+        // conversion" warning and compared the column against the literal
+        // string "Array" — a wrong query plus a PHP warning under the strict
+        // test flags.
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('only scalar values');
+
+        $this->conform->where(['id' => [1, [2, 3]]]);
+    }
+
+    public function testMisspelledOperatorWithAListValueIsReportedNotBound(): void
+    {
+        // The residual of the misspelled-operator case: "betwen" is not a known
+        // operator, so the tuple is read as a bare IN list, and its second
+        // element is a list. That is the shape the guard above turns into an
+        // explicit error instead of a PDO warning.
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('only scalar values');
+
+        $this->conform->where(['id' => ['betwen', [1, 2]]]);
+    }
+
     // ==================== Iteration ====================
 
     public function testCursorIterationWalksEveryRowInOrder(): void

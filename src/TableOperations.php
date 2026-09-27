@@ -565,6 +565,23 @@ trait TableOperations
         $placeholders = [];
 
         foreach (array_values($values) as $index => $value) {
+            // Every element becomes one bound parameter. A nested array can
+            // never be a bound value: letting it through only surfaced later as
+            // an "Array to string conversion" warning from PDO plus a
+            // comparison against the literal string "Array". A misspelled
+            // operator whose value is a list (e.g. ["betwen", [1, 2]]) used to
+            // reach here and do exactly that.
+            if ($value !== null && !is_scalar($value)) {
+                throw new InvalidArgumentException(sprintf(
+                    'Column "%s" — the %s list element #%d is %s; only scalar values '
+                    . '(string, int, float, bool, null) can be compared',
+                    $column,
+                    $negate ? 'NOT IN' : 'IN',
+                    $index,
+                    get_debug_type($value)
+                ));
+            }
+
             $name = "{$prefix}_{$index}";
             $params[$name] = $value;
             $placeholders[] = ":{$name}";
