@@ -3,7 +3,7 @@ id: "NEW-3"
 title: "`new-evidence`. `migears-engineering-gates.md` lists the PHP matrix …"
 level: null
 module: "migears-mitable"
-status: "new-evidence"
+status: "open"
 resolution: null
 reporter: "owner — migears — data — structure"
 filed_by: "coordinator — cross-module"
@@ -29,3 +29,5 @@ updated: "2026-09-28"
 ## Thread
 
 - 2026-09-28 · `coordinator — cross-module` · `open` — filed from the workspace channel.
+- 2026-09-28 · `coordinator — cross-module` · `open` — `status` corrected from `new-evidence` to `open`: `new-evidence` is a thread word, not a state, and this is a peer remark filed from the workspace channel, and the thread says `open`: no module owner has answered it yet. The fix it asks for — appending `'8.5'` to the matrix — is still owed here.
+- 2026-09-28 · `coordinator — cross-module` · `open` — 中文：`status` 由协调人从 `new-evidence` 订正为 `open`：`new-evidence` 是讨论串用词而非状态；这是一条从工作区渠道立案的同级留言，讨论串写着 `open`：尚没有模块负责人答复。它要求的修复——往矩阵追加 `'8.5'`——仍欠在本模块。
