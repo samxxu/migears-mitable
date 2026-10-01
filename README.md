@@ -57,6 +57,22 @@ The reasoning behind this split, the migration scenarios the class is built for,
 - **Transactions** — an optional `withTransaction()` wrapper; the boundary stays the caller's
 - **Cross-driver** — MySQL/MariaDB and SQLite, one class per dialect; add a dialect by implementing four hooks
 
+## Boundaries
+
+**In scope**
+
+- The cross-driver table abstraction: `MiTableInterface`, the dialect-agnostic `TableOperations` trait, and one class per dialect — `MySQLTable` for MySQL/MariaDB and `SQLiteTable` for SQLite (PSR-4 root `MiGears\MiTable`).
+- Single-table execution for migration scripts: DDL (create/drop/exists/rename/truncate, column and index changes), CRUD (`insert`, `bulkInsert`, `update`, `delete`, `find`, `where`, `count`), parameter-bound conditions, schema introspection, primary-key cursor iteration with resumable checkpoints, and an optional `withTransaction()` wrapper.
+- Driver conformance as a tested property: one shared conformance trait asserts every dialect-shared behaviour on both SQLite (unit suite) and MySQL (integration suite); dialect tests cover only what is deliberately different.
+- PHP 8.1+ with `ext-pdo` only — pure PDO, no query-builder dependency.
+
+**Not in scope (by design)**
+
+- The migration runner — migration registry, execution order, up/down, idempotency, automatic rollback and cross-table schema diffing stay outside; this package executes a single migration step.
+- Query building and multi-table work — no nested conditions, groups or joins; use `migears/sql` for query building, and reach joins or multi-table writes through `getPdo()`.
+- Any model / Active Record layer, and any events, hooks or observers.
+- Automatic transaction or rollback management beyond `withTransaction()` (no nesting, no retry); schema changes are not atomic — MySQL commits implicitly around DDL.
+
 ## Installation
 
 ```bash
@@ -352,6 +368,7 @@ Schema changes are not covered by this. MySQL commits implicitly around DDL, so 
 - **`rowCount()` is not a reliable success signal.** Drivers differ on whether it reports matched rows or changed rows. Verify a migration with `find()` or `count()` rather than trusting the return value of `update()` or `bulkInsert()`.
 - **`exists()` asks the catalog.** On MySQL and SQLite it queries `information_schema` / `sqlite_master`, so a connection or permission failure raises a real error instead of being reported as "table missing". It has no try/catch on those two paths.
 - **`delete([])` deletes every row**, matching the previous behaviour. Pass conditions deliberately.
+- **`update($data, [])` updates every row**, the same way `delete([])` does. Pass conditions deliberately.
 - **`where()`'s `$orderBy` argument is raw SQL** and is not parameter bound. Never interpolate user input into it.
 - **Iteration reads rows in pages**, so a row deleted after its page was loaded is still yielded.
 - **`bulkInsert()` requires every row to carry the same columns.** Ragged input throws with the row index and the difference, rather than dropping a later row's extra column or binding null for one it lacks.
@@ -418,7 +435,7 @@ The unit suite runs against an in-memory SQLite database and needs nothing else.
 
 A container spawned for the run is removed when the process ends, and each test method starts from a schema with no tables. A `MYSQL_DSN` or `MYSQL_HOST` you provide is used as given: if it is wrong the suite fails instead of quietly falling back, so a misconfigured job cannot pass by accident.
 
-CI runs both suites on every push across PHP 8.1–8.4, the integration one against a MySQL service container.
+CI runs both suites on every push across PHP 8.1–8.5, the integration one against a MySQL service container.
 
 ## License
 
@@ -480,6 +497,22 @@ $rows  = new SQLiteTable($pdo, 'rows');   // SQLite
 - **可续跑的扫描** — `cursor()` 与 `withCursorStart()` 让中断的遍历从断点继续，不跳行也不重复
 - **事务** — 可选的 `withTransaction()` 包装；事务边界仍归调用方
 - **跨驱动** — MySQL/MariaDB 与 SQLite，每个方言一个类；实现四个钩子即可新增方言
+
+## 边界
+
+**范围内**
+
+- 跨驱动的表抽象：`MiTableInterface`、与方言无关的 `TableOperations` trait，以及每个方言一个类 —— MySQL/MariaDB 的 `MySQLTable`、SQLite 的 `SQLiteTable`（PSR-4 根为 `MiGears\MiTable`）。
+- 服务于迁移脚本的单表操作：DDL（create/drop/exists/rename/truncate，列的增删改改名与索引变更）、CRUD（`insert`、`bulkInsert`、`update`、`delete`、`find`、`where`、`count`）、参数绑定条件、结构反射、主键游标迭代与可续跑断点，以及可选的 `withTransaction()` 包装。
+- 把驱动一致性当作被测试的性质：同一个一致性 trait 在 SQLite（单元套件）与 MySQL（集成套件）上断言所有方言共享的行为，方言测试只覆盖刻意不同的部分。
+- 仅要求 PHP 8.1+ 与 `ext-pdo` —— 纯 PDO，不依赖查询构建器。
+
+**范围外（刻意不做）**
+
+- 迁移运行器 —— 迁移记录表、执行顺序、up/down、幂等、自动回滚、跨表结构比对都留在包外；本包只执行单个迁移步骤。
+- 查询构建与多表操作 —— 没有嵌套条件、分组和 JOIN；查询构建请用 `migears/sql`，JOIN 或多表写入请通过 `getPdo()` 直达。
+- 任何模型 / Active Record 层，以及任何事件、钩子或观察者。
+- `withTransaction()` 之外的自动事务与回滚管理（不提供嵌套、不提供重试）；结构变更不具备原子性 —— MySQL 在 DDL 前后会隐式提交。
 
 ## 安装
 
@@ -776,6 +809,7 @@ $users->withTransaction(function () use ($users) {
 - **`rowCount()` 不是可靠的成功判据。** 不同驱动对"匹配行数"和"实际变更行数"的返回并不一致。请用 `find()` 或 `count()` 校验迁移结果，而不是相信 `update()` 或 `bulkInsert()` 的返回值。
 - **`exists()` 查的是数据字典。** 在 MySQL 和 SQLite 上它查询 `information_schema` / `sqlite_master`，因此连接或权限故障会抛出真实错误，而不会被报告成"表不存在"。这两条路径上没有 try/catch。
 - **`delete([])` 会删除全部行**，与既有行为一致。请有意识地传条件。
+- **`update($data, [])` 会更新全部行**，与 `delete([])` 相同。请有意识地传条件。
 - **`where()` 的 `$orderBy` 参数是裸 SQL**，不做参数绑定。绝不要把用户输入拼进这里。
 - **迭代按页读取**，因此某个行所在页已加载后它才被删除，该行仍会被返回。
 - **`bulkInsert()` 要求每行携带相同的列。** 参差输入会抛异常并指出行号与差异，而不是丢弃后续行多出的列、或为缺失的列绑定 null。
@@ -842,7 +876,7 @@ composer test:integration  # MySQL + MySQL 一致性
 
 运行期间起的容器会在进程结束时删除，每个测试方法都从"不含任何表"的空库开始。你显式提供的 `MYSQL_DSN` 或 `MYSQL_HOST` 会被原样使用：配错了就是失败，而不是悄悄降级，因此配置错误的流水线不会意外通过。
 
-CI 在每次推送时都会跑这两个套件，PHP 版本覆盖 8.1–8.4，其中集成套件跑在 MySQL service container 上。
+CI 在每次推送时都会跑这两个套件，PHP 版本覆盖 8.1–8.5，其中集成套件跑在 MySQL service container 上。
 
 ## 许可证
 
