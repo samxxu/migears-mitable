@@ -17,27 +17,29 @@ Legend — **P0** functional or security · **P1** documentation that fails when
 
 | | |
 |---|---|
-| Unsettled | P0 0 · P1 1 · P2 2 · P3 3 · other 6 |
-| Settled | 0 of 12 |
-| Waiting on the owner | `NEW-3`, `NEW-4`, `NEW-5` |
-| Waiting on the reviewer | `P1-1`, `P2-1`, `P2-2`, `P3-2`, `P3-3`, `G1`, `G2`, `G5` |
+| Unsettled | P0 0 · P1 0 · P2 0 · P3 3 · other 2 |
+| Settled | 9 of 14 |
+| Waiting on the owner | `P3-4`, `P3-5` |
 | Waiting on the coordinator | _nothing_ |
-| Deferred, owing nobody | `P3-1` |
+| Waiting on the reviewer | _nothing_ |
+| Deferred, owing nobody | `P3-1`, `NEW-4`, `NEW-5` |
 
 | id | level | status | title |
 |---|---|---|---|
-| [`P1-1`](issues/P1-1.md) | P1 | **fixed** | The README still advertises 'MySQL/MariaDB and SQLite, with a graceful … |
-| [`P2-1`](issues/P2-1.md) | P2 | **fixed** | `quoteIdentifier()` wraps names in backticks without escaping embedded … |
-| [`P2-2`](issues/P2-2.md) | P2 | **fixed** | `insert()` and `bulkInsert()` build placeholders from the raw column … |
+| [`P1-1`](issues/P1-1.md) | P1 | **verified** | The README still advertises 'MySQL/MariaDB and SQLite, with a graceful … |
+| [`P2-1`](issues/P2-1.md) | P2 | **verified** | `quoteIdentifier()` wraps names in backticks without escaping embedded … |
+| [`P2-2`](issues/P2-2.md) | P2 | **verified** | `insert()` and `bulkInsert()` build placeholders from the raw column … |
 | [`P3-1`](issues/P3-1.md) | P3 | **deferred** | Unusually among its siblings, this module's CI runs only the two test … |
-| [`P3-2`](issues/P3-2.md) | P3 | **fixed** | The README says 'roughly 760 lines of effective code, most of it the … |
-| [`P3-3`](issues/P3-3.md) | P3 | **fixed** | An operator name outside the known set is treated as a value list: … |
-| [`G1`](issues/G1.md) | - | **fixed** | CI file and workflow name: this module uses `.github/workflows/ci.yml` … |
-| [`G2`](issues/G2.md) | - | **fixed** | Strict flags: `phpunit.xml.dist` currently sets `failOnWarning`, … |
-| [`G5`](issues/G5.md) | - | **fixed** | PHP support matrix: `.github/workflows/ci.yml:13` reads `php: ['8.1', … |
-| [`NEW-3`](issues/NEW-3.md) | - | **open** | `new-evidence`. `migears-engineering-gates.md` lists the PHP matrix … |
-| [`NEW-4`](issues/NEW-4.md) | - | **open** | `new-evidence`. This is the only module of 27 still caching `vendor/` … |
-| [`NEW-5`](issues/NEW-5.md) | - | **open** | `new-evidence`. Not a finding. Only 5 of 27 modules use … |
+| [`P3-2`](issues/P3-2.md) | P3 | **verified** | The README says 'roughly 760 lines of effective code, most of it the … |
+| [`P3-3`](issues/P3-3.md) | P3 | **verified** | An operator name outside the known set is treated as a value list: … |
+| [`P3-4`](issues/P3-4.md) | P3 | **open** | update() with empty $where updates all rows, consistent with delete() … |
+| [`P3-5`](issues/P3-5.md) | P3 | **open** | README CI section claims 'PHP 8.1–8.4' but G5 added 8.5 to the matrix; … |
+| [`G1`](issues/G1.md) | - | **verified** | CI file and workflow name: this module uses `.github/workflows/ci.yml` … |
+| [`G2`](issues/G2.md) | - | **verified** | Strict flags: `phpunit.xml.dist` currently sets `failOnWarning`, … |
+| [`G5`](issues/G5.md) | - | **verified** | PHP support matrix: `.github/workflows/ci.yml:13` reads `php: ['8.1', … |
+| [`NEW-3`](issues/NEW-3.md) | - | **verified** | `new-evidence`. `migears-engineering-gates.md` lists the PHP matrix … |
+| [`NEW-4`](issues/NEW-4.md) | - | **deferred** | `new-evidence`. This is the only module of 27 still caching `vendor/` … |
+| [`NEW-5`](issues/NEW-5.md) | - | **deferred** | `new-evidence`. Not a finding. Only 5 of 27 modules use … |
 
 ## Unclosed
 
@@ -46,24 +48,17 @@ highest severity first. `waiting on` is the party who acts next, read from that 
 
 | | |
 |---|---|
-| Unclosed | **12** of 12 |
-| By status | `open` 3 · `deferred` 1 · `fixed` 8 |
-| Waiting on | owner 3 · reviewer 8 · - 1 |
+| Unclosed | **5** of 14 |
+| By status | `open` 2 · `deferred` 3 |
+| Waiting on | owner 2 · - 3 |
 
 | level | item | status | waiting on | title |
 |---|---|---|---|---|
-| **P1** | [`P1-1`](issues/P1-1.md) | `fixed` | reviewer | The README still advertises 'MySQL/MariaDB and SQLite, with a graceful … |
-| **P2** | [`P2-1`](issues/P2-1.md) | `fixed` | reviewer | `quoteIdentifier()` wraps names in backticks without escaping embedded … |
-| **P2** | [`P2-2`](issues/P2-2.md) | `fixed` | reviewer | `insert()` and `bulkInsert()` build placeholders from the raw column … |
 | **P3** | [`P3-1`](issues/P3-1.md) | `deferred` | - | Unusually among its siblings, this module's CI runs only the two test … |
-| **P3** | [`P3-2`](issues/P3-2.md) | `fixed` | reviewer | The README says 'roughly 760 lines of effective code, most of it the … |
-| **P3** | [`P3-3`](issues/P3-3.md) | `fixed` | reviewer | An operator name outside the known set is treated as a value list: … |
-| **-** | [`G1`](issues/G1.md) | `fixed` | reviewer | CI file and workflow name: this module uses `.github/workflows/ci.yml` … |
-| **-** | [`G2`](issues/G2.md) | `fixed` | reviewer | Strict flags: `phpunit.xml.dist` currently sets `failOnWarning`, … |
-| **-** | [`G5`](issues/G5.md) | `fixed` | reviewer | PHP support matrix: `.github/workflows/ci.yml:13` reads `php: ['8.1', … |
-| **-** | [`NEW-3`](issues/NEW-3.md) | `open` | owner | `new-evidence`. `migears-engineering-gates.md` lists the PHP matrix … |
-| **-** | [`NEW-4`](issues/NEW-4.md) | `open` | owner | `new-evidence`. This is the only module of 27 still caching `vendor/` … |
-| **-** | [`NEW-5`](issues/NEW-5.md) | `open` | owner | `new-evidence`. Not a finding. Only 5 of 27 modules use … |
+| **P3** | [`P3-4`](issues/P3-4.md) | `open` | owner | update() with empty $where updates all rows, consistent with delete() … |
+| **P3** | [`P3-5`](issues/P3-5.md) | `open` | owner | README CI section claims 'PHP 8.1–8.4' but G5 added 8.5 to the matrix; … |
+| **-** | [`NEW-4`](issues/NEW-4.md) | `deferred` | - | `new-evidence`. This is the only module of 27 still caching `vendor/` … |
+| **-** | [`NEW-5`](issues/NEW-5.md) | `deferred` | - | `new-evidence`. Not a finding. Only 5 of 27 modules use … |
 
 ## Verdict
 
@@ -104,27 +99,29 @@ No test for not like operator; no test for between / not between operators; no t
 
 | | |
 |---|---|
-| 未了结 | P0 0 · P1 1 · P2 2 · P3 3 · 其他 6 |
-| 已了结 | 0 / 12 |
-| 等负责人 | `NEW-3`, `NEW-4`, `NEW-5` |
-| 等评审方 | `P1-1`, `P2-1`, `P2-2`, `P3-2`, `P3-3`, `G1`, `G2`, `G5` |
+| 未了结 | P0 0 · P1 0 · P2 0 · P3 3 · 其他 2 |
+| 已了结 | 9 / 14 |
+| 等模块主 | `P3-4`, `P3-5` |
 | 等协调人 | _无_ |
-| 已暂缓，不欠谁 | `P3-1` |
+| 等评审方 | _无_ |
+| 已暂缓，不欠谁 | `P3-1`, `NEW-4`, `NEW-5` |
 
 | id | 级别 | 状态 | 标题 |
 |---|---|---|---|
-| [`P1-1`](issues/P1-1.md) | P1 | **fixed** | README 仍宣传「MySQL/MariaDB 与 SQLite，其他驱动优雅降级」，但仓库已无任何通用或回退类：new … |
-| [`P2-1`](issues/P2-1.md) | P2 | **fixed** | quoteIdentifier() 用反引号包裹名字但不转义内嵌反引号，因此表名含反引号时语句被截断（PDOException: near … |
-| [`P2-2`](issues/P2-2.md) | P2 | **fixed** | insert() 与 bulkInsert() 用原始列名拼占位符（":{$c}"、":{$c}_{$i}"），因此合法的 user-id … |
+| [`P1-1`](issues/P1-1.md) | P1 | **verified** | README 仍宣传「MySQL/MariaDB 与 SQLite，其他驱动优雅降级」，但仓库已无任何通用或回退类：new … |
+| [`P2-1`](issues/P2-1.md) | P2 | **verified** | quoteIdentifier() 用反引号包裹名字但不转义内嵌反引号，因此表名含反引号时语句被截断（PDOException: near … |
+| [`P2-2`](issues/P2-2.md) | P2 | **verified** | insert() 与 bulkInsert() 用原始列名拼占位符（":{$c}"、":{$c}_{$i}"），因此合法的 user-id … |
 | [`P3-1`](issues/P3-1.md) | P3 | **deferred** | 在兄弟模块中少见：本模块 CI 只跑两个测试套件，从不跑 composer analyse，因此 L6 … |
-| [`P3-2`](issues/P3-2.md) | P3 | **fixed** | README 称「约 760 行有效代码，其中大部分是共享 trait」，而实测净代码 804 行（trait 389 行，约 … |
-| [`P3-3`](issues/P3-3.md) | P3 | **fixed** | 已知集合外的操作符名会被当作值列表：where(["id" => ["==", 1]]) 编译成 id IN ('==', 1) … |
-| [`G1`](issues/G1.md) | - | **fixed** | CI 文件名与工作流名：本模块使用 `.github/workflows/ci.yml`、`name: CI`。工作区标准是 … |
-| [`G2`](issues/G2.md) | - | **fixed** | 严格开关：`phpunit.xml.dist` 目前已开启 … |
-| [`G5`](issues/G5.md) | - | **fixed** | PHP 支持矩阵：`.github/workflows/ci.yml:13` 是 `php: ['8.1', '8.2', '8.3', … |
-| [`NEW-3`](issues/NEW-3.md) | - | **open** | `new-evidence`。`migears-engineering-gates.md` 把 PHP 矩阵列在「本已统一，无需动作」里，写作 … |
-| [`NEW-4`](issues/NEW-4.md) | - | **open** | `new-evidence`。在 `migears-data-structure` 于 2026-09-28 去掉自己的缓存后，本模块是 27 … |
-| [`NEW-5`](issues/NEW-5.md) | - | **open** | `new-evidence`。不是问题。27 个模块中只有 5 个使用了 … |
+| [`P3-2`](issues/P3-2.md) | P3 | **verified** | README 称「约 760 行有效代码，其中大部分是共享 trait」，而实测净代码 804 行（trait 389 行，约 … |
+| [`P3-3`](issues/P3-3.md) | P3 | **verified** | 已知集合外的操作符名会被当作值列表：where(["id" => ["==", 1]]) 编译成 id IN ('==', 1) … |
+| [`P3-4`](issues/P3-4.md) | P3 | **open** | update() 空 $where 会更新所有行，与 delete() 行为一致，但 README 仅对 delete() 明确警告空 … |
+| [`P3-5`](issues/P3-5.md) | P3 | **open** | README CI 部分声称「PHP 8.1–8.4」，但 G5 已将 8.5 加入矩阵；英文第 421 行和中文第 845 行已过时。 |
+| [`G1`](issues/G1.md) | - | **verified** | CI 文件名与工作流名：本模块使用 `.github/workflows/ci.yml`、`name: CI`。工作区标准是 … |
+| [`G2`](issues/G2.md) | - | **verified** | 严格开关：`phpunit.xml.dist` 目前已开启 … |
+| [`G5`](issues/G5.md) | - | **verified** | PHP 支持矩阵：`.github/workflows/ci.yml:13` 是 `php: ['8.1', '8.2', '8.3', … |
+| [`NEW-3`](issues/NEW-3.md) | - | **verified** | `new-evidence`。`migears-engineering-gates.md` 把 PHP 矩阵列在「本已统一，无需动作」里，写作 … |
+| [`NEW-4`](issues/NEW-4.md) | - | **deferred** | `new-evidence`。在 `migears-data-structure` 于 2026-09-28 去掉自己的缓存后，本模块是 27 … |
+| [`NEW-5`](issues/NEW-5.md) | - | **deferred** | `new-evidence`。不是问题。27 个模块中只有 5 个使用了 … |
 
 ## 未关闭
 
@@ -133,24 +130,17 @@ No test for not like operator; no test for between / not between operators; no t
 
 | | |
 |---|---|
-| 未关闭 | **12** / 12 |
-| 按状态 | `open` 3 · `deferred` 1 · `fixed` 8 |
-| 等在谁 | 负责人 3 · 评审方 8 · - 1 |
+| 未关闭 | **5** / 14 |
+| 按状态 | `open` 2 · `deferred` 3 |
+| 等在谁 | 模块主 2 · - 3 |
 
 | 级别 | 条目 | 状态 | 等在谁 | 标题 |
 |---|---|---|---|---|
-| **P1** | [`P1-1`](issues/P1-1.md) | `fixed` | 评审方 | README 仍宣传「MySQL/MariaDB 与 SQLite，其他驱动优雅降级」，但仓库已无任何通用或回退类：new … |
-| **P2** | [`P2-1`](issues/P2-1.md) | `fixed` | 评审方 | quoteIdentifier() 用反引号包裹名字但不转义内嵌反引号，因此表名含反引号时语句被截断（PDOException: near … |
-| **P2** | [`P2-2`](issues/P2-2.md) | `fixed` | 评审方 | insert() 与 bulkInsert() 用原始列名拼占位符（":{$c}"、":{$c}_{$i}"），因此合法的 user-id … |
 | **P3** | [`P3-1`](issues/P3-1.md) | `deferred` | - | 在兄弟模块中少见：本模块 CI 只跑两个测试套件，从不跑 composer analyse，因此 L6 … |
-| **P3** | [`P3-2`](issues/P3-2.md) | `fixed` | 评审方 | README 称「约 760 行有效代码，其中大部分是共享 trait」，而实测净代码 804 行（trait 389 行，约 … |
-| **P3** | [`P3-3`](issues/P3-3.md) | `fixed` | 评审方 | 已知集合外的操作符名会被当作值列表：where(["id" => ["==", 1]]) 编译成 id IN ('==', 1) … |
-| **-** | [`G1`](issues/G1.md) | `fixed` | 评审方 | CI 文件名与工作流名：本模块使用 `.github/workflows/ci.yml`、`name: CI`。工作区标准是 … |
-| **-** | [`G2`](issues/G2.md) | `fixed` | 评审方 | 严格开关：`phpunit.xml.dist` 目前已开启 … |
-| **-** | [`G5`](issues/G5.md) | `fixed` | 评审方 | PHP 支持矩阵：`.github/workflows/ci.yml:13` 是 `php: ['8.1', '8.2', '8.3', … |
-| **-** | [`NEW-3`](issues/NEW-3.md) | `open` | 负责人 | `new-evidence`。`migears-engineering-gates.md` 把 PHP 矩阵列在「本已统一，无需动作」里，写作 … |
-| **-** | [`NEW-4`](issues/NEW-4.md) | `open` | 负责人 | `new-evidence`。在 `migears-data-structure` 于 2026-09-28 去掉自己的缓存后，本模块是 27 … |
-| **-** | [`NEW-5`](issues/NEW-5.md) | `open` | 负责人 | `new-evidence`。不是问题。27 个模块中只有 5 个使用了 … |
+| **P3** | [`P3-4`](issues/P3-4.md) | `open` | 模块主 | update() 空 $where 会更新所有行，与 delete() 行为一致，但 README 仅对 delete() 明确警告空 … |
+| **P3** | [`P3-5`](issues/P3-5.md) | `open` | 模块主 | README CI 部分声称「PHP 8.1–8.4」，但 G5 已将 8.5 加入矩阵；英文第 421 行和中文第 845 行已过时。 |
+| **-** | [`NEW-4`](issues/NEW-4.md) | `deferred` | - | `new-evidence`。在 `migears-data-structure` 于 2026-09-28 去掉自己的缓存后，本模块是 27 … |
+| **-** | [`NEW-5`](issues/NEW-5.md) | `deferred` | - | `new-evidence`。不是问题。27 个模块中只有 5 个使用了 … |
 
 ## 结论
 
